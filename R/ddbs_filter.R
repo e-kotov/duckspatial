@@ -142,7 +142,7 @@ ddbs_filter <- function(
 
         data_tbl <- DBI::dbGetQuery(
             conn, glue::glue("
-                SELECT {rest_query} ST_AsText(v1.{x_geom}) AS {x_geom}
+                SELECT {rest_query} ST_AsWKB(v1.{x_geom}) AS {x_geom}
                 FROM {x_list$query_name} v1, {y_list$query_name} v2
                 WHERE {sel_pred}(v2.{y_geom}, v1.{x_geom}, {distance})
             ")
@@ -151,7 +151,7 @@ ddbs_filter <- function(
     } else {
         data_tbl <- DBI::dbGetQuery(
             conn, glue::glue("
-                SELECT {rest_query} ST_AsText(v1.{x_geom}) AS {x_geom}
+                SELECT {rest_query} ST_AsWKB(v1.{x_geom}) AS {x_geom}
                 FROM {x_list$query_name} v1, {y_list$query_name} v2
                 WHERE {sel_pred}(v2.{y_geom}, v1.{x_geom})
             ")

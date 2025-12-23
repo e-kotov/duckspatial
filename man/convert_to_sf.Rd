@@ -16,12 +16,13 @@ doesn't have a \code{crs_column}, and you know the CRS.}
 storing the CRS (created automatically by \code{\link{ddbs_write_vector}}).
 Set to \code{NULL} if absent.}
 
-\item{x_geom}{name of geometry}
+\item{x_geom}{name of geometry column}
 }
 \value{
 sf
 }
 \description{
-Converts a table that has been read from DuckDB into an sf object
+Converts a table that has been read from DuckDB into an sf object.
+Optimized to handle binary WKB streams using wk and geoarrow.
 }
 \keyword{internal}

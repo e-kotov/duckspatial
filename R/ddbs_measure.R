@@ -119,12 +119,12 @@ ddbs_area <- function(
     ## 5.1. create query
     if (length(x_rest) == 0) {
         tmp.query <- glue::glue("
-            SELECT ST_Area({x_geom}) AS {new_column}, ST_AsText({x_geom}) as {x_geom}
+            SELECT ST_Area({x_geom}) AS {new_column}, ST_AsWKB({x_geom}) as {x_geom}
             FROM {x_list$query_name}
         ")
     } else {
         tmp.query <- glue::glue("
-            SELECT {x_rest}, ST_Area({x_geom}) AS {new_column}, ST_AsText({x_geom}) as {x_geom}
+            SELECT {x_rest}, ST_Area({x_geom}) AS {new_column}, ST_AsWKB({x_geom}) as {x_geom}
             FROM {x_list$query_name}
         ")
     }
@@ -266,12 +266,12 @@ ddbs_length <- function(
     ## 5.1. create query
     if (length(x_rest) == 0) {
         tmp.query <- glue::glue("
-            SELECT ST_Length({x_geom}) AS {new_column}, ST_AsText({x_geom}) as {x_geom}
+            SELECT ST_Length({x_geom}) AS {new_column}, ST_AsWKB({x_geom}) as {x_geom}
             FROM {x_list$query_name}
         ")
     } else {
         tmp.query <- glue::glue("
-            SELECT {x_rest}, ST_Length({x_geom}) AS {new_column}, ST_AsText({x_geom}) as {x_geom}
+            SELECT {x_rest}, ST_Length({x_geom}) AS {new_column}, ST_AsWKB({x_geom}) as {x_geom}
             FROM {x_list$query_name}
         ")
     }

@@ -91,11 +91,11 @@ ddbs_boundary <- function(
     ## 4. create the base query
     if (length(x_rest) == 0) {
         tmp.query <- glue::glue("
-            SELECT ST_AsText(ST_Boundary({x_geom})) as {x_geom} FROM {x_list$query_name};
+            SELECT ST_AsWKB(ST_Boundary({x_geom})) as {x_geom} FROM {x_list$query_name};
         ")
     } else {
         tmp.query <- glue::glue("
-            SELECT {x_rest}, ST_AsText(ST_Boundary({x_geom})) as {x_geom} FROM {x_list$query_name};
+            SELECT {x_rest}, ST_AsWKB(ST_Boundary({x_geom})) as {x_geom} FROM {x_list$query_name};
         ")
     }
     ## send the query
@@ -252,19 +252,19 @@ ddbs_envelope <- function(
     if (isTRUE(by_feature)) {
         if (length(x_rest) == 0) {
             tmp.query <- glue::glue("
-                SELECT ST_AsText({st_envelope_clause}) as {x_geom}
+                SELECT ST_AsWKB({st_envelope_clause}) as {x_geom}
                 FROM {x_list$query_name};
             ")
         } else {
             tmp.query <- glue::glue("
                 SELECT {x_rest},
-                ST_AsText({st_envelope_clause}) as {x_geom}
+                ST_AsWKB({st_envelope_clause}) as {x_geom}
                 FROM {x_list$query_name};
             ")
         }
     } else {
         tmp.query <- glue::glue("
-            SELECT ST_AsText({st_envelope_clause}) as {x_geom},
+            SELECT ST_AsWKB({st_envelope_clause}) as {x_geom},
             FIRST({crs_column}) as {crs_column}
             FROM {x_list$query_name};
         ")

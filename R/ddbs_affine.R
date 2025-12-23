@@ -181,11 +181,11 @@ ddbs_rotate <- function(
     ## 4.1. create query
     if (length(x_rest) == 0) {
         tmp.query <- glue::glue("
-            SELECT ST_AsText({rotation_expr}) as {x_geom} FROM {x_list$query_name};
+            SELECT ST_AsWKB({rotation_expr}) as {x_geom} FROM {x_list$query_name};
         ")
     } else {
         tmp.query <- glue::glue("
-            SELECT {x_rest}, ST_AsText({rotation_expr}) as {x_geom} FROM {x_list$query_name};
+            SELECT {x_rest}, ST_AsWKB({rotation_expr}) as {x_geom} FROM {x_list$query_name};
         ")
     }
     ## 4.2. retrieve results from the query
@@ -330,11 +330,11 @@ ddbs_rotate_3d <- function(
     ## 4.1. create query
     if (length(x_rest) == 0) {
         tmp.query <- glue::glue("
-            SELECT ST_AsText({rotation_expr}) as {x_geom} FROM {x_list$query_name};
+            SELECT ST_AsWKB({rotation_expr}) as {x_geom} FROM {x_list$query_name};
         ")
     } else {
         tmp.query <- glue::glue("
-            SELECT {x_rest}, ST_AsText({rotation_expr}) as {x_geom} FROM {x_list$query_name};
+            SELECT {x_rest}, ST_AsWKB({rotation_expr}) as {x_geom} FROM {x_list$query_name};
         ")
     }
     ## 4.2. retrieve results from the query
@@ -464,11 +464,11 @@ ddbs_shift <- function(
     ## 4.1. create query
     if (length(x_rest) == 0) {
         tmp.query <- glue::glue("
-            SELECT ST_AsText({shift_expr}) as {x_geom} FROM {x_list$query_name};
+            SELECT ST_AsWKB({shift_expr}) as {x_geom} FROM {x_list$query_name};
         ")
     } else {
         tmp.query <- glue::glue("
-            SELECT {x_rest}, ST_AsText({shift_expr}) as {x_geom} FROM {x_list$query_name};
+            SELECT {x_rest}, ST_AsWKB({shift_expr}) as {x_geom} FROM {x_list$query_name};
         ")
     }
     ## 4.2. retrieve results from the query
@@ -650,11 +650,11 @@ ddbs_flip <- function(
     ## 4.1. create query
     if (length(x_rest) == 0) {
         tmp.query <- glue::glue("
-            SELECT ST_AsText({flip_expr}) as {x_geom} FROM {x_list$query_name};
+            SELECT ST_AsWKB({flip_expr}) as {x_geom} FROM {x_list$query_name};
         ")
     } else {
         tmp.query <- glue::glue("
-            SELECT {x_rest}, ST_AsText({flip_expr}) as {x_geom} FROM {x_list$query_name};
+            SELECT {x_rest}, ST_AsWKB({flip_expr}) as {x_geom} FROM {x_list$query_name};
         ")
     }
     ## 4.2. retrieve results from the query
@@ -818,11 +818,11 @@ ddbs_scale <- function(
     ## 4.1. create query
     if (length(x_rest) == 0) {
         tmp.query <- glue::glue("
-            SELECT ST_AsText({scale_expr}) as {x_geom} FROM {x_list$query_name};
+            SELECT ST_AsWKB({scale_expr}) as {x_geom} FROM {x_list$query_name};
         ")
     } else {
         tmp.query <- glue::glue("
-            SELECT {x_rest}, ST_AsText({scale_expr}) as {x_geom} FROM {x_list$query_name};
+            SELECT {x_rest}, ST_AsWKB({scale_expr}) as {x_geom} FROM {x_list$query_name};
         ")
     }
     ## 4.2. retrieve results from the query
@@ -984,11 +984,11 @@ ddbs_shear <- function(
     ## 4.1. create query
     if (length(x_rest) == 0) {
         tmp.query <- glue::glue("
-            SELECT ST_AsText({shear_expr}) as {x_geom} FROM {x_list$query_name};
+            SELECT ST_AsWKB({shear_expr}) as {x_geom} FROM {x_list$query_name};
         ")
     } else {
         tmp.query <- glue::glue("
-            SELECT {x_rest}, ST_AsText({shear_expr}) as {x_geom} FROM {x_list$query_name};
+            SELECT {x_rest}, ST_AsWKB({shear_expr}) as {x_geom} FROM {x_list$query_name};
         ")
     }
     ## 4.2. retrieve results from the query

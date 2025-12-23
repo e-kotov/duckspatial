@@ -126,11 +126,11 @@ ddbs_concave_hull <- function(
     ## 4. create the base query
     if (length(x_rest) == 0) {
         tmp.query <- glue::glue("
-            SELECT ST_AsText(ST_ConcaveHull({x_geom}, {ratio}, {allow_holes})) as {x_geom} FROM {x_list$query_name};
+            SELECT ST_AsWKB(ST_ConcaveHull({x_geom}, {ratio}, {allow_holes})) as {x_geom} FROM {x_list$query_name};
         ")
     } else {
         tmp.query <- glue::glue("
-            SELECT {x_rest}, ST_AsText(ST_ConcaveHull({x_geom}, {ratio}, {allow_holes})) as {x_geom} FROM {x_list$query_name};
+            SELECT {x_rest}, ST_AsWKB(ST_ConcaveHull({x_geom}, {ratio}, {allow_holes})) as {x_geom} FROM {x_list$query_name};
         ")
     }
     ## send the query

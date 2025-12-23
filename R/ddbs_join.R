@@ -182,7 +182,7 @@ ddbs_join <- function(
     if (length(x_rest) == 0) {
         tmp.query <- glue::glue("
             SELECT {paste0('tbl_y.', y_rest, collapse = ', ')},
-                   ST_AsText(tbl_x.{x_geom}) AS {x_geom}
+                   ST_AsWKB(tbl_x.{x_geom}) AS {x_geom}
             FROM {x_list$query_name} tbl_x, {y_list$query_name} tbl_y
             WHERE {sel_pred}(tbl_x.{x_geom}, tbl_y.{y_geom})
         ")
@@ -191,7 +191,7 @@ ddbs_join <- function(
         tmp.query <- glue::glue("
             SELECT {paste0('tbl_x.', x_rest, collapse = ', ')},
                    {paste0('tbl_y.', y_rest, collapse = ', ')},
-                   ST_AsText(tbl_x.{x_geom}) AS {x_geom}
+                   ST_AsWKB(tbl_x.{x_geom}) AS {x_geom}
             FROM {x_list$query_name} tbl_x, {y_list$query_name} tbl_y
             WHERE {sel_pred}(tbl_x.{x_geom}, tbl_y.{y_geom})
         ")

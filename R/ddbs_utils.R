@@ -195,7 +195,7 @@ ddbs_glimpse <- function(conn,
     data_tbl <- DBI::dbGetQuery(conn, glue::glue("
       SELECT
       {no_geom_cols},
-      ST_AsText({geom_name}) AS {geom_name}
+      ST_AsWKB({geom_name}) AS {geom_name}
       FROM {name}
       LIMIT 10;
   "))
