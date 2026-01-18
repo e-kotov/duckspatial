@@ -1027,6 +1027,10 @@ ddbs_temp_conn <- function(file = FALSE, read_only = FALSE, cleanup = TRUE,
     conn <- DBI::dbConnect(duckdb::duckdb(), dbdir = db_file, read_only = read_only)
     attr(conn, "db_file") <- db_file
     
+    # Checks and installs the Spatial extension
+    ddbs_install(conn, upgrade = TRUE, quiet = TRUE)
+    ddbs_load(conn, quiet = TRUE)
+
     # Configure resources
     ddbs_set_resources(conn, threads = threads, memory_limit_gb = memory_limit_gb)
 
@@ -1040,7 +1044,11 @@ ddbs_temp_conn <- function(file = FALSE, read_only = FALSE, cleanup = TRUE,
   } else {
     # In-memory connection
     conn <- ddbs_create_conn(dbdir = "memory", threads = threads, memory_limit_gb = memory_limit_gb)
-    withr::defer(duckdb::dbDisconnect(conn), envir = envir)
+    withr::defer({
+      if (DBI::dbIsValid(conn)) {
+        tryCatch(suppressWarnings(DBI::dbDisconnect(conn)), error = function(e) NULL)
+      }
+    }, envir = envir)
   }
   
   conn
