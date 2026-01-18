@@ -437,13 +437,7 @@ ddbs_create_conn <- function(dbdir = "memory", threads = NULL, memory_limit_gb =
     ddbs_load(conn, quiet = TRUE)
 
     # Configure resources if requested
-    if (!is.null(threads)) {
-        DBI::dbExecute(conn, sprintf("SET threads = %d;", as.integer(threads)))
-    }
-
-    if (!is.null(memory_limit_gb)) {
-        DBI::dbExecute(conn, sprintf("SET memory_limit = '%dGB';", as.integer(memory_limit_gb)))
-    }
+    ddbs_set_resources(conn, threads = threads, memory_limit_gb = memory_limit_gb)
 
     return(conn)
 }

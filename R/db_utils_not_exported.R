@@ -1028,12 +1028,7 @@ ddbs_temp_conn <- function(file = FALSE, read_only = FALSE, cleanup = TRUE,
     attr(conn, "db_file") <- db_file
     
     # Configure resources
-    if (!is.null(threads)) {
-      DBI::dbExecute(conn, sprintf("SET threads = %d;", as.integer(threads)))
-    }
-    if (!is.null(memory_limit_gb)) {
-      DBI::dbExecute(conn, sprintf("SET memory_limit = '%dGB';", as.integer(memory_limit_gb)))
-    }
+    ddbs_set_resources(conn, threads = threads, memory_limit_gb = memory_limit_gb)
 
     # Cleanup: disconnect and optionally delete file
     withr::defer({

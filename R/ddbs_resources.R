@@ -36,7 +36,7 @@ ddbs_set_resources <- function(conn, threads = NULL, memory_limit_gb = NULL) {
   }
 
   if (!is.null(memory_limit_gb)) {
-    DBI::dbExecute(conn, sprintf("SET memory_limit = '%dGB';", as.integer(memory_limit_gb)))
+    DBI::dbExecute(conn, sprintf("SET memory_limit = '%.1fGB';", as.numeric(memory_limit_gb)))
   }
 
   # 3. Return current state
