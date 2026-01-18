@@ -7,7 +7,7 @@
 #' @template threads
 #' @template memory_limit_gb
 #'
-#' @return Invisibly returns a list containing the current system settings.
+#' @return For \code{ddbs_set_resources()}, invisibly returns a list containing the current system settings; for \code{ddbs_get_resources()}, visibly returns the same list for direct inspection.
 #' @export
 #'
 #' @examples

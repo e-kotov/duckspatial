@@ -17,7 +17,7 @@ ddbs_get_resources(conn)
 \item{memory_limit_gb}{Numeric. Memory limit in GB. If \code{NULL} (default), the setting is not changed, and DuckDB engine will use 80\% of available operating system memory it detects (warning, on some shared HPC nodes the detected memory might be the full node memory, not the per-job allocation).}
 }
 \value{
-Invisibly returns a list containing the current system settings.
+For \code{ddbs_set_resources()}, invisibly returns a list containing the current system settings; for \code{ddbs_get_resources()}, visibly returns the same list for direct inspection.
 }
 \description{
 Configure technical system settings for a DuckDB connection, such as memory limits
