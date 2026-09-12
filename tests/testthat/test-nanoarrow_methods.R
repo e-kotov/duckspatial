@@ -38,25 +38,22 @@ describe("as_nanoarrow_array_stream.duckspatial_df()", {
     stream$release()
   })
 
-  it("works with native = TRUE (materialized path)", {
-    # Skip if sf can't be loaded (unlikely here but safe)
-    testthat::skip_if_not_installed("sf")
-    
-    stream <- nanoarrow::as_nanoarrow_array_stream(nc_ddbs, native = TRUE)
-    expect_s3_class(stream, "nanoarrow_array_stream")
-    
+  native_extension <- function(x) {
+    stream <- nanoarrow::as_nanoarrow_array_stream(x, native = TRUE)
+    on.exit(stream$release())
+
     schema <- stream$get_schema()
     child_names <- vapply(schema$children, function(x) x$name, character(1))
-    geom_idx <- which(child_names == attr(nc_ddbs, "sf_column"))
-    
+    geom_idx <- which(child_names == attr(x, "sf_column"))
+
     geom_schema <- schema$children[[geom_idx]]
-    
-    # native = TRUE should produce native geoarrow types (e.g. geoarrow.polygon)
-    # depending on the geometry type of the input
-    ext_name <- geom_schema$metadata[["ARROW:extension:name"]]
-    expect_true(grepl("^geoarrow\\.", ext_name))
-    
-    stream$release()
+    geom_schema$metadata[["ARROW:extension:name"]]
+  }
+
+  it("produces native geometry layouts when native = TRUE", {
+    expect_equal(native_extension(points_ddbs), "geoarrow.point")
+    expect_equal(native_extension(rivers_ddbs), "geoarrow.linestring")
+    expect_equal(native_extension(nc_ddbs), "geoarrow.multipolygon")
   })
 
   it("works with geometry_schema (Native layout)", {

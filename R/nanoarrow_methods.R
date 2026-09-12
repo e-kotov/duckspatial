@@ -39,15 +39,33 @@ as_nanoarrow_array_stream.duckspatial_df <- function(x, ...,
   if (isTRUE(native)) {
     tab <- arrow::as_arrow_table(arrow_obj)
     
-    # Infer native schema from WKB column
     wkb_col <- nanoarrow::as_nanoarrow_array(arrow::as_arrow_array(tab[[geom_col]]))
-    
-    # Try to infer native schema
-    target_geom_schema <- tryCatch({
-      geoarrow::infer_geoarrow_schema(wkb_col, coord_type = "SEPARATE")
-    }, error = function(e) {
-      geoarrow::geoarrow_wkb(crs = ddbs_crs(x))
-    })
+
+    geometry_types <- unique(as.character(ddbs_geometry_type(
+      x,
+      by_feature = FALSE
+    )))
+    geometry_type <- if (all(geometry_types %in% c("POINT", "MULTIPOINT"))) {
+      if ("MULTIPOINT" %in% geometry_types) "MULTIPOINT" else "POINT"
+    } else if (all(geometry_types %in% c("LINESTRING", "MULTILINESTRING"))) {
+      if ("MULTILINESTRING" %in% geometry_types) {
+        "MULTILINESTRING"
+      } else {
+        "LINESTRING"
+      }
+    } else if (all(geometry_types %in% c("POLYGON", "MULTIPOLYGON"))) {
+      if ("MULTIPOLYGON" %in% geometry_types) "MULTIPOLYGON" else "POLYGON"
+    }
+
+    if (is.null(geometry_type)) {
+      cli::cli_abort("Cannot infer one native GeoArrow geometry type.")
+    }
+
+    target_geom_schema <- geoarrow::geoarrow_native(
+      geometry_type,
+      coord_type = "SEPARATE",
+      crs = ddbs_crs(x)
+    )
     
     # Cast WKB to Native layout using geoarrow kernels
     tab_list <- as.list(tab)
