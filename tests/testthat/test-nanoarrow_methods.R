@@ -56,6 +56,51 @@ describe("as_nanoarrow_array_stream.duckspatial_df()", {
     expect_equal(native_extension(nc_ddbs), "geoarrow.multipolygon")
   })
 
+  it("preserves non-geometry column types when native = TRUE", {
+    # The native path must replace only the geometry column. Rebuilding the
+    # table from R vectors re-infers every other column's type, which silently
+    # narrows int64 to int32 whenever the values happen to fit.
+    conn <- DBI::dbConnect(duckdb::duckdb())
+    on.exit(DBI::dbDisconnect(conn, shutdown = TRUE), add = TRUE)
+    duckspatial::ddbs_load(conn)
+
+    DBI::dbExecute(conn, paste(
+      "CREATE TABLE typed AS SELECT",
+      "i AS small_id,",
+      "3000000000 + i AS large_id,",
+      "i::VARCHAR AS label,",
+      "ST_Point(i * 0.01, i * 0.01) AS geom",
+      "FROM range(10) s(i)"
+    ))
+
+    typed <- function() {
+      duckspatial::as_duckspatial_df(
+        dplyr::tbl(conn, "typed"),
+        crs = sf::st_crs(4326)
+      )
+    }
+
+    stream <- nanoarrow::as_nanoarrow_array_stream(typed(), native = TRUE)
+    on.exit(stream$release(), add = TRUE)
+    schema <- stream$get_schema()
+
+    # "l" is int64, "i" is int32, "u" is utf8
+    expect_equal(schema$children$small_id$format, "l")
+    expect_equal(schema$children$large_id$format, "l")
+    expect_equal(schema$children$label$format, "u")
+    expect_equal(
+      schema$children$geom$metadata[["ARROW:extension:name"]],
+      "geoarrow.point"
+    )
+
+    values <- as.data.frame(
+      nanoarrow::as_nanoarrow_array_stream(typed(), native = TRUE)
+    )
+    expect_equal(nrow(values), 10)
+    expect_equal(as.numeric(values$small_id), 0:9)
+    expect_equal(as.numeric(values$large_id), 3000000000 + 0:9)
+  })
+
   it("works with geometry_schema (Native layout)", {
     # Request a native point schema
     target_schema <- geoarrow::geoarrow_point()

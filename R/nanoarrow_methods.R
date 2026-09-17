@@ -67,12 +67,19 @@ as_nanoarrow_array_stream.duckspatial_df <- function(x, ...,
       crs = ddbs_crs(x)
     )
     
-    # Cast WKB to Native layout using geoarrow kernels
-    tab_list <- as.list(tab)
+    # Cast WKB to Native layout using geoarrow kernels, replacing only the
+    # geometry column. Every other column stays an Arrow array throughout:
+    # `as.list()` on an Arrow table converts columns to R vectors, and
+    # rebuilding from those re-infers their types, silently narrowing int64 to
+    # int32 whenever the values happen to fit.
+    tab_list <- stats::setNames(
+      lapply(names(tab), function(column) tab[[column]]),
+      names(tab)
+    )
     # geoarrow::as_geoarrow_array needs a nanoarrow_array or wk object
     tab_list[[geom_col]] <- geoarrow::as_geoarrow_array(wkb_col, schema = target_geom_schema)
-    
-    new_tab <- arrow::as_arrow_table(arrow::record_batch(!!!tab_list))
+
+    new_tab <- arrow::arrow_table(!!!tab_list)
     return(nanoarrow::as_nanoarrow_array_stream(new_tab, schema = schema))
   }
 
