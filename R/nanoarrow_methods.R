@@ -6,12 +6,14 @@
 #' @param native If TRUE, transforms WKB to a "Native" GeoArrow layout (e.g., 
 #'   Point, Polygon) using optimized Arrow-to-Arrow kernels. This layout is 
 #'   optimized for high-performance rendering in tools like Deck.GL.
+#' @param chunk_size Maximum number of rows in each Arrow record batch.
 #'
 #' @return A \code{nanoarrow_array_stream}
 #' @exportS3Method nanoarrow::as_nanoarrow_array_stream duckspatial_df
 as_nanoarrow_array_stream.duckspatial_df <- function(x, ..., 
                                                      schema = NULL, 
-                                                     native = FALSE) {
+                                                     native = FALSE,
+                                                     chunk_size = 1e6) {
   
   geom_col <- attr(x, "sf_column") %||% "geom"
   conn <- dbplyr::remote_con(x)
@@ -33,7 +35,7 @@ as_nanoarrow_array_stream.duckspatial_df <- function(x, ...,
 
   # 2. Execute and get Arrow data
   res <- DBI::dbSendQuery(conn, query_sql, arrow = TRUE)
-  arrow_obj <- duckdb::duckdb_fetch_arrow(res)
+  arrow_obj <- duckdb::duckdb_fetch_arrow(res, chunk_size = chunk_size)
   
   # 3. Native Path: Transform WKB to Native GeoArrow entirely in Arrow memory
   if (isTRUE(native)) {

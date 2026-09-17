@@ -56,6 +56,20 @@ describe("as_nanoarrow_array_stream.duckspatial_df()", {
     expect_equal(native_extension(nc_ddbs), "geoarrow.multipolygon")
   })
 
+  it("uses chunk_size for streamed record batches", {
+    stream <- nanoarrow::as_nanoarrow_array_stream(
+      points_ddbs,
+      native = TRUE,
+      chunk_size = 200
+    )
+    on.exit(stream$release())
+
+    table <- arrow::as_arrow_table(stream)
+    expect_equal(table$num_rows, 1000)
+    expect_equal(table[["id"]]$num_chunks, 5)
+    expect_equal(table[[attr(points_ddbs, "sf_column")]]$num_chunks, 5)
+  })
+
   it("writes Arrow IPC for results larger than one Arrow chunk", {
     # Arrow chunks the fetched table at 1e6 rows. Converting the geometry
     # column into a single array leaves every batch after the first holding a
