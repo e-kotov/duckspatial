@@ -56,6 +56,34 @@ describe("as_nanoarrow_array_stream.duckspatial_df()", {
     expect_equal(native_extension(nc_ddbs), "geoarrow.multipolygon")
   })
 
+  it("writes Arrow IPC for results larger than one Arrow chunk", {
+    # Arrow chunks the fetched table at 1e6 rows. Converting the geometry
+    # column into a single array leaves every batch after the first holding a
+    # sliced geometry child with a nonzero offset, which the IPC writer
+    # rejects, so anything over one chunk could not be serialised at all.
+    skip_on_cran()
+    conn <- DBI::dbConnect(duckdb::duckdb())
+    on.exit(DBI::dbDisconnect(conn, shutdown = TRUE), add = TRUE)
+    duckspatial::ddbs_load(conn)
+
+    DBI::dbExecute(conn, paste(
+      "CREATE TABLE wide AS SELECT i AS id,",
+      "ST_Point(i * 0.000001, i * 0.000001) AS geom",
+      "FROM range(2000000) s(i)"
+    ))
+
+    x <- duckspatial::as_duckspatial_df(
+      dplyr::tbl(conn, "wide"),
+      crs = sf::st_crs(4326)
+    )
+    stream <- nanoarrow::as_nanoarrow_array_stream(x, native = TRUE)
+
+    connection <- rawConnection(raw(0), "w")
+    on.exit(close(connection), add = TRUE)
+    expect_no_error(nanoarrow::write_nanoarrow(stream, connection))
+    expect_gt(length(rawConnectionValue(connection)), 0)
+  })
+
   it("preserves non-geometry column types when native = TRUE", {
     # The native path must replace only the geometry column. Rebuilding the
     # table from R vectors re-infers every other column's type, which silently

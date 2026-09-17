@@ -38,8 +38,6 @@ as_nanoarrow_array_stream.duckspatial_df <- function(x, ...,
   # 3. Native Path: Transform WKB to Native GeoArrow entirely in Arrow memory
   if (isTRUE(native)) {
     tab <- arrow::as_arrow_table(arrow_obj)
-    
-    wkb_col <- nanoarrow::as_nanoarrow_array(arrow::as_arrow_array(tab[[geom_col]]))
 
     geometry_types <- unique(as.character(ddbs_geometry_type(
       x,
@@ -76,8 +74,23 @@ as_nanoarrow_array_stream.duckspatial_df <- function(x, ...,
       lapply(names(tab), function(column) tab[[column]]),
       names(tab)
     )
+
+    # Convert one chunk at a time so the geometry column keeps the same chunk
+    # layout as the rest of the table. Combining it into a single array instead
+    # makes every record batch after the first hold a sliced geometry child
+    # with a nonzero offset, which the Arrow IPC writer rejects
+    # ("Cannot encode arrays with nonzero offset").
     # geoarrow::as_geoarrow_array needs a nanoarrow_array or wk object
-    tab_list[[geom_col]] <- geoarrow::as_geoarrow_array(wkb_col, schema = target_geom_schema)
+    tab_list[[geom_col]] <- arrow::ChunkedArray$create(
+      !!!lapply(tab[[geom_col]]$chunks, function(chunk) {
+        arrow::as_arrow_array(
+          geoarrow::as_geoarrow_array(
+            nanoarrow::as_nanoarrow_array(chunk),
+            schema = target_geom_schema
+          )
+        )
+      })
+    )
 
     new_tab <- arrow::arrow_table(!!!tab_list)
     return(nanoarrow::as_nanoarrow_array_stream(new_tab, schema = schema))
