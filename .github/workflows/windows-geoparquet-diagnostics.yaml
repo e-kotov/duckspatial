@@ -8,7 +8,7 @@ on:
 jobs:
   windows-test-diagnostics:
     runs-on: windows-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v6
       - uses: r-lib/actions/setup-r@v2
@@ -18,23 +18,99 @@ jobs:
         with:
           extra-packages: local::., any::testthat, any::pkgload
           needs: check
+      - name: Prepare process diagnostics
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force diagnostics | Out-Null
+          @'
+          options(warn = 1)
+          args <- commandArgs(trailingOnly = TRUE)
+          label <- args[[1L]]
+          log_dir <- normalizePath("diagnostics", winslash = "/")
+          checkpoint_file <- file.path(log_dir, paste0(label, "-checkpoints.log"))
+          .windows_checkpoint <- function(..., console = TRUE) {
+            line <- paste(format(Sys.time(), "%Y-%m-%d %H:%M:%OS3"),
+                          paste0(..., collapse = ""))
+            cat(line, "\n", file = checkpoint_file, append = TRUE)
+            if (console) {
+              cat(line, "\n", file = stderr())
+              flush(stderr())
+            }
+          }
+          .windows_checkpoint("PROCESS START: ", label, " PID=", Sys.getpid())
+          library(testthat)
+          library(duckdb)
+          print(sessionInfo())
+
+          # Trace the native-call boundary, so an R error can be distinguished
+          # from a native crash or a hang while executing SQL or disconnecting.
+          trace("rapi_prepare", where = asNamespace("duckdb"), print = FALSE,
+            tracer = quote(.GlobalEnv$.windows_checkpoint("SQL ENTER: ", query, console = FALSE)),
+            exit = quote(.GlobalEnv$.windows_checkpoint("SQL LEAVE", console = FALSE)))
+          for (native_call in c("rapi_execute", "rapi_disconnect", "rapi_shutdown")) {
+            trace(native_call, where = asNamespace("duckdb"), print = FALSE,
+              tracer = substitute(.GlobalEnv$.windows_checkpoint(LABEL, console = FALSE),
+                                  list(LABEL = paste(native_call, "ENTER"))),
+              exit = substitute(.GlobalEnv$.windows_checkpoint(LABEL, console = FALSE),
+                                list(LABEL = paste(native_call, "LEAVE"))))
+          }
+
+          test_error <- tryCatch({
+            .windows_checkpoint("TESTS ENTER")
+            testthat::test_local(
+              filter = if (label == "full-suite") NULL else label,
+              reporter = "location", stop_on_failure = TRUE)
+            .windows_checkpoint("TESTS RETURNED")
+            NULL
+          }, error = function(e) {
+            .windows_checkpoint("R ERROR: ", conditionMessage(e))
+            print(e)
+            dump.frames(file.path(log_dir, paste0(label, "-frames")), to.file = TRUE)
+            e
+          })
+
+          # Exercise the package's real unload hook, then the remaining native
+          # finalizers. A final shell marker confirms that R itself has exited.
+          .windows_checkpoint("PACKAGE UNLOAD ENTER")
+          if ("duckspatial" %in% loadedNamespaces()) pkgload::unload("duckspatial")
+          .windows_checkpoint("PACKAGE UNLOAD LEAVE")
+          .windows_checkpoint("GC ENTER")
+          gc()
+          .windows_checkpoint("GC LEAVE")
+          status <- if (is.null(test_error)) 0L else 1L
+          .windows_checkpoint("R EXIT REQUEST: status=", status)
+          quit(save = "no", status = status)
+          '@ | Set-Content -Path .github/windows-test-diagnostics.R
       - name: New GeoParquet tests in isolation
         timeout-minutes: 10
         shell: pwsh
         run: |
-          @'
-          options(warn = 1)
-          library(testthat)
-          testthat::test_local(filter = "geoparquet-versions", reporter = "summary", stop_on_failure = TRUE)
-          '@ | Set-Content -Path .github/geoparquet-isolated.R
-          Rscript .github/geoparquet-isolated.R
-      - name: Full test suite with file-by-file progress
+          Rscript .github/windows-test-diagnostics.R geoparquet-versions 2>&1 | Tee-Object -FilePath diagnostics/geoparquet-console.log
+          $code = $LASTEXITCODE
+          "PROCESS EXIT: $code" | Tee-Object -FilePath diagnostics/geoparquet-console.log -Append
+          exit $code
+      - name: Extension tests with native SQL tracing
+        if: ${{ !cancelled() }}
+        timeout-minutes: 10
+        shell: pwsh
+        run: |
+          Rscript .github/windows-test-diagnostics.R db_extension 2>&1 | Tee-Object -FilePath diagnostics/extensions-console.log
+          $code = $LASTEXITCODE
+          "PROCESS EXIT: $code" | Tee-Object -FilePath diagnostics/extensions-console.log -Append
+          exit $code
+      - name: Full test suite with test and teardown progress
+        if: ${{ !cancelled() }}
         timeout-minutes: 15
         shell: pwsh
         run: |
-          @'
-          options(warn = 1)
-          library(testthat)
-          testthat::test_local(reporter = "summary", stop_on_failure = TRUE)
-          '@ | Set-Content -Path .github/geoparquet-suite-diagnostics.R
-          Rscript .github/geoparquet-suite-diagnostics.R
+          Rscript .github/windows-test-diagnostics.R full-suite 2>&1 | Tee-Object -FilePath diagnostics/full-suite-console.log
+          $code = $LASTEXITCODE
+          "PROCESS EXIT: $code" | Tee-Object -FilePath diagnostics/full-suite-console.log -Append
+          exit $code
+      - name: Upload Windows diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-test-diagnostics-${{ github.run_attempt }}
+          path: diagnostics
+          if-no-files-found: warn

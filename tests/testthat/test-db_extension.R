@@ -148,6 +148,7 @@ describe("ddbs_load()", {
 ## Community extensions
 testthat::test_that("Community extensions are installed", {
   conn <- duckdb::dbConnect(duckdb::duckdb())
+  on.exit(duckdb::dbDisconnect(conn), add = TRUE)
   out <- tryCatch(ddbs_install(conn, extension = "h3"), error = function(e) NULL)
   if (is.null(out)) {
     testthat::pass()
@@ -159,6 +160,7 @@ testthat::test_that("Community extensions are installed", {
 ## Other core extensions
 testthat::test_that("Community extensions are installed", {
   conn <- duckdb::dbConnect(duckdb::duckdb())
+  on.exit(duckdb::dbDisconnect(conn), add = TRUE)
   out <- tryCatch(ddbs_install(conn, extension = "aws"), error = function(e) NULL)
   if (is.null(out)) {
     testthat::pass()
