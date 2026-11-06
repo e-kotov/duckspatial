@@ -195,7 +195,7 @@ ddbs_write_geoparquet <- function(data, path, conn, overwrite, crs, options,
     primary <- attr(data, "sf_column", exact = TRUE)
     geometry <- names(data)[vapply(data, inherits, logical(1), what = "sfc")]
     # [.sf can keep the active geometry implicitly; use an ordinary named list.
-    crses <- utils::setNames(lapply(geometry, function(name) sf::st_crs(data[[name]])), geometry)
+    crses <- stats::setNames(lapply(geometry, function(name) sf::st_crs(data[[name]])), geometry)
     if (!is.null(override)) crses[[primary]] <- override
     registered <- as.data.frame(data)
     for (name in geometry) registered[[name]] <- ddbs_sfc_to_wkb(data[[name]])
@@ -204,7 +204,7 @@ ddbs_write_geoparquet <- function(data, path, conn, overwrite, crs, options,
     on.exit(duckdb::duckdb_unregister(conn, view), add = TRUE)
     source <- quote_id(view)
     fields <- names(registered)
-    expressions <- utils::setNames(quote_id(fields), fields)
+    expressions <- stats::setNames(quote_id(fields), fields)
     for (name in geometry) {
       expressions[[name]] <- ddbs_geoparquet_cast(
         paste0("ST_GeomFromWKB(", quote_id(name), ")"), crses[[name]], conn, version)
@@ -230,7 +230,7 @@ ddbs_write_geoparquet <- function(data, path, conn, overwrite, crs, options,
     primary <- attr(data, "sf_column", exact = TRUE)
     has_active <- !is.null(primary) && primary %in% geometry
     if (!has_active) primary <- geometry[[1L]]
-    crses <- utils::setNames(lapply(geometry, function(name) {
+    crses <- stats::setNames(lapply(geometry, function(name) {
       if (identical(name, primary) && !is.null(override)) return(override)
       ddbs_geoparquet_native_crs(conn, types$column_type[match(name, types$column_name)])
     }), geometry)
@@ -238,7 +238,7 @@ ddbs_write_geoparquet <- function(data, path, conn, overwrite, crs, options,
     # cleared. R-side CRS attributes can be stale after dplyr operations.
     # Users may override explicitly with crs = ... above.
     fields <- types$column_name
-    expressions <- utils::setNames(quote_id(fields), fields)
+    expressions <- stats::setNames(quote_id(fields), fields)
     for (name in geometry) {
       expressions[[name]] <- ddbs_geoparquet_cast(quote_id(name), crses[[name]], conn, version)
     }
