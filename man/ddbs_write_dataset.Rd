@@ -19,7 +19,10 @@ ddbs_write_dataset(
   parquet_row_group_size = NULL,
   layer_creation_options = NULL,
   quiet = FALSE,
-  duckdb_storage_version = duckspatial_storage_default()
+  duckdb_storage_version = duckspatial_storage_default(),
+  geoparquet_version = "V1",
+  parquet_spatial_order = FALSE,
+  parquet_compression_level = NULL
 )
 }
 \arguments{
@@ -57,11 +60,21 @@ runs on a temporary DuckDB database.}
 
 \item{overwrite}{Logical. If \code{TRUE}, overwrites existing file.}
 
-\item{crs}{Output CRS (e.g., "EPSG:4326"). Passed to GDAL as \code{SRS} option. Ignored for Parquet.}
+\item{crs}{Output CRS assignment (e.g., "EPSG:4326"). Passed to GDAL as
+\code{SRS}. For Parquet, overrides the active geometry column's CRS; \code{NA}
+explicitly means unknown in V1 output. V2 currently rejects unknown CRS
+because DuckDB cannot encode native \code{srid:0}. This assigns metadata,
+not a coordinate transformation. Use \code{ddbs_transform()} or
+\code{sf::st_transform()} to reproject first.}
 
 \item{layer}{Table name for native DuckDB database output.}
 
-\item{options}{Named list of additional options passed to \code{COPY}.}
+\item{options}{Named list of additional options passed to \code{COPY}.
+For Parquet, names are case-insensitive. An existing \code{GEOPARQUET_VERSION}
+option is honoured unless it conflicts with an explicit
+\code{geoparquet_version}. \code{KV_METADATA} must be a named list of
+strings; the \code{geo} key is managed by duckspatial. Other options override
+the convenience arguments.}
 
 \item{partitioning}{Character vector of columns to partition by (Parquet/CSV only).}
 
@@ -70,6 +83,20 @@ runs on a temporary DuckDB database.}
 \item{parquet_row_group_size}{Row group size for Parquet.}
 
 \item{layer_creation_options}{GDAL layer creation options.}
+
+\item{geoparquet_version}{GeoParquet output version: \code{"V1"} (default,
+1.0.0, for compatibility with older readers) or \code{"V2"} (2.0.0, native
+Parquet geometry logical types and geospatial statistics). Parquet only.
+Independent of \code{PARQUET_VERSION} and \code{duckdb_storage_version}.}
+
+\item{parquet_spatial_order}{Logical. If \code{TRUE}, order Parquet rows
+by a Hilbert index of the active geometry within the dataset extent.
+Null and empty geometries sort last. This adds an extent scan and an
+external sort in DuckDB; it does not collect the dataset into R.
+Default is \code{FALSE}.}
+
+\item{parquet_compression_level}{Optional integer ZSTD compression level.
+Requires \code{parquet_compression = "zstd"} (or equivalent COPY option).}
 
 \item{quiet}{A logical value. If \code{TRUE}, suppresses any informational messages.
 Defaults to \code{FALSE}.}
@@ -106,6 +133,24 @@ Spatial Storage} (\code{storage_version = "v1.5.0"}) by default so CRS metadata 
 retained in native \code{GEOMETRY} columns. These files require DuckDB >= 1.5.0
 to open; use \strong{Legacy Compatibility} (\code{storage_version = "v1.0.0"})
 when the output must be readable by older DuckDB versions.
+
+Parquet exports preserve CRS metadata for each geometry column. For lazy
+inputs, the DuckDB query type is authoritative, even when CRS is unknown:
+the R attribute may be stale after a dplyr transformation.
+\code{crs} overrides the active geometry without reprojecting or changing
+other geometry columns.
+
+V2 delegates native geometry serialization and row-group spatial
+statistics to DuckDB and supplies an explicit \code{geo} metadata block.
+It emits known CRS as a native annotation and inline PROJJSON metadata.
+DuckDB 2.0 cannot construct native \code{srid:0}, so unknown CRS in V2
+is rejected rather than silently mislabelled as CRS84. V1 explicitly
+writes \code{crs: null} for unknown CRS using conventional WKB bytes.
+Geometry types are declared unknown (\code{geometry_types: []}), allowed
+by the spec. Neither version copies a dataset-wide bbox into partitions.
+
+Spatial ordering, ZSTD compression, and row-group size around 100000 are
+optional optimizations; defaults are unchanged for V2.
 }
 \examples{
 \dontrun{
@@ -119,6 +164,13 @@ ds <- ddbs_open_dataset(path)
 ddbs_write_dataset(ds, "output.geojson")
 ddbs_write_dataset(ds, "output.gpkg")
 ddbs_write_dataset(ds, "output.parquet")
+
+# GeoParquet 2.0 and optional distribution optimizations
+ddbs_write_dataset(
+  ds, "output_v2.parquet", geoparquet_version = "V2",
+  parquet_spatial_order = TRUE, parquet_compression = "zstd",
+  parquet_compression_level = 15, parquet_row_group_size = 100000
+)
 
 # Explicit GDAL driver for non-standard extension
 ddbs_write_dataset(ds, "mydata.dat", gdal_driver = "GeoJSON")
@@ -141,6 +193,7 @@ This function is inspired by and builds upon the logic found in the
 particularly its \code{write_dataset} and \code{write_geo} functions.
 For advanced features like cloud storage (S3) support, the
 \code{duckdbfs} package is highly recommended.
+\url{https://geoparquet.org/releases/v2.0.0/}
 }
 \seealso{
 \code{\link[=ddbs_drivers]{ddbs_drivers()}} to list all available GDAL drivers and formats.
