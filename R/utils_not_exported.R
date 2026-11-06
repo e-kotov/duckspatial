@@ -286,6 +286,7 @@ import_view_to_connection <- function(target_conn, source_conn, source_object, t
     if (!is.null(query_sql)) {
       tryCatch({
         res <- DBI::dbSendQuery(source_conn, query_sql, arrow = TRUE)
+        on.exit(DBI::dbClearResult(res), add = TRUE)
         
         reader <- duckdb::duckdb_fetch_arrow(res)
         stream <- nanoarrow::as_nanoarrow_array_stream(reader)
@@ -300,7 +301,6 @@ import_view_to_connection <- function(target_conn, source_conn, source_object, t
         ))
         
         # Cleanup Arrow registration
-        DBI::dbClearResult(res)
         tryCatch(duckdb::duckdb_unregister_arrow(target_conn, temp_arrow_name), error = function(e) NULL)
         
         if (!quiet) cli::cli_inform("Imported via nanoarrow streaming (zero R materialization)")

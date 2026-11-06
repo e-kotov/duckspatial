@@ -104,6 +104,48 @@ test_that("Strategy 4: Nanoarrow streaming works for cross-memory-DB", {
   expect_true(res$method %in% c("nanoarrow", "duckdb_register"))
 })
 
+test_that("target Arrow registration failure closes the source result", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("nanoarrow")
+  source_conn <- ddbs_temp_conn()
+  target_conn <- ddbs_temp_conn()
+  expected <- data.frame(id = 1:3, label = c("a", NA_character_, "c"))
+  DBI::dbWriteTable(source_conn, "source_data", expected)
+  source <- dplyr::tbl(source_conn, "source_data")
+
+  # Keep the actual source query and Arrow fetch, retaining the result through
+  # the helper's return. Deliberately fail target registration so every backend
+  # build exercises the same collection fallback and cleanup boundary.
+  arrow_result <- NULL
+  registration_attempted <- FALSE
+  fetch_arrow <- duckdb::duckdb_fetch_arrow
+  testthat::local_mocked_bindings(
+    duckdb_fetch_arrow = function(res, ...) {
+      arrow_result <<- res
+      fetch_arrow(res, ...)
+    },
+    duckdb_register_arrow = function(conn, ...) {
+      registration_attempted <<- identical(conn, target_conn)
+      stop("test target Arrow registration failure", call. = FALSE)
+    },
+    .package = "duckdb"
+  )
+
+  expect_warning(
+    imported <- import_view_to_connection(
+      target_conn, source_conn, source, "fallback_import"
+    ),
+    "Imported via duckdb_register"
+  )
+  expect_identical(imported$method, "duckdb_register")
+  expect_true(registration_attempted)
+  expect_s4_class(arrow_result, "duckdb_result")
+  expect_false(DBI::dbIsValid(arrow_result))
+  expect_equal(DBI::dbGetQuery(target_conn,
+                              "SELECT * FROM fallback_import ORDER BY id"), expected)
+  expect_true(DBI::dbIsValid(source_conn))
+})
+
 test_that("Strategy 5: Collect+sf works for duckspatial_df", {
 
   skip_if_not_installed("duckdb")
