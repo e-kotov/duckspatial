@@ -3,6 +3,7 @@ name: Independent Windows DuckDB geometry teardown
 on:
   push:
     branches: [debug/windows-exit-validation-20261106]
+    paths: [.github/windows-native-geometry.R, .github/windows-native-geometry.py]
   workflow_dispatch:
 
 jobs:
