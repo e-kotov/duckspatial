@@ -70,6 +70,73 @@ describe("as_nanoarrow_array_stream.duckspatial_df()", {
     expect_equal(table[[attr(points_ddbs, "sf_column")]]$num_chunks, 5)
   })
 
+  it("clears DBI results while returned Arrow streams retain their data", {
+    conn <- ddbs_temp_conn()
+    input <- sf::st_sf(
+      id = 1:5,
+      geometry = sf::st_sfc(lapply(as.double(1:5), function(i) sf::st_point(c(i, -i))),
+                            crs = 4326)
+    )
+    x <- duckspatial::as_duckspatial_df(input, conn = conn)
+
+    # Retain the actual result objects so GC cannot hide a missing explicit
+    # dbClearResult(). The wrapper still fetches every real Arrow batch.
+    results <- list()
+    fetch_arrow <- duckdb::duckdb_fetch_arrow
+    testthat::local_mocked_bindings(
+      duckdb_fetch_arrow = function(res, ...) {
+        results[[length(results) + 1L]] <<- res
+        fetch_arrow(res, ...)
+      },
+      .package = "duckdb"
+    )
+
+    streams <- lapply(c(FALSE, TRUE), function(native) {
+      nanoarrow::as_nanoarrow_array_stream(x, native = native, chunk_size = 2)
+    })
+    expect_length(results, 2)
+    for (result in results) {
+      expect_s4_class(result, "duckdb_result")
+      expect_false(DBI::dbIsValid(result))
+    }
+
+    # The fetched Arrow table owns the returned buffers. Both stream paths
+    # must still work after the DBI result and source connection are gone.
+    duckspatial::ddbs_stop_conn(conn)
+    rm(x, result)
+    results <- list()
+    invisible(gc())
+    for (stream in streams) {
+      table <- arrow::as_arrow_table(stream)
+      expect_equal(table$num_rows, 5)
+      expect_equal(table[["id"]]$num_chunks, 3)
+      expect_equal(table[["geometry"]]$num_chunks, 3)
+      values <- as.data.frame(table)
+      expect_equal(values$id, input$id)
+      expect_equal(sf::st_coordinates(sf::st_as_sfc(values$geometry)),
+                   sf::st_coordinates(input))
+    }
+  })
+
+  it("clears the DBI result when fetching Arrow data fails", {
+    result <- NULL
+    fetch_arrow <- duckdb::duckdb_fetch_arrow
+    testthat::local_mocked_bindings(
+      duckdb_fetch_arrow = function(res, ...) {
+        result <<- res
+        fetch_arrow(res, ...)
+      },
+      .package = "duckdb"
+    )
+
+    expect_error(
+      nanoarrow::as_nanoarrow_array_stream(points_ddbs, chunk_size = 0),
+      "Chunk Size"
+    )
+    expect_s4_class(result, "duckdb_result")
+    expect_false(DBI::dbIsValid(result))
+  })
+
   it("writes Arrow IPC for results larger than one Arrow chunk", {
     # Arrow chunks the fetched table at 1e6 rows. Converting the geometry
     # column into a single array leaves every batch after the first holding a
