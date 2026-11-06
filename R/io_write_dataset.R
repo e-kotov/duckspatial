@@ -39,7 +39,9 @@
 #' @param overwrite Logical. If `TRUE`, overwrites existing file.
 #' @param crs Output CRS assignment (e.g., "EPSG:4326"). Passed to GDAL as `SRS`.
 #'   For Parquet, overrides the active geometry column's CRS; `NA` explicitly
-#'   means unknown. This assigns metadata, not a coordinate transformation.
+#'   means unknown in V1 output. V2 currently rejects unknown CRS because
+#'   DuckDB cannot encode native `srid:0`. This assigns metadata, not a
+#'   coordinate transformation.
 #'   Use [ddbs_transform()] or [sf::st_transform()] to reproject first.
 #' @param layer Table name for native DuckDB database output.
 #' @param options Named list of additional options passed to `COPY`. For Parquet,
@@ -80,16 +82,19 @@
 #'   Requires `parquet_compression = "zstd"` (or the equivalent COPY option).
 #'
 #' @details
-#' Parquet exports preserve each geometry column's CRS. For lazy input, native
-#' DuckDB CRS metadata takes precedence; the active geometry's R attribute is
-#' used only when its native CRS is unknown. `crs` explicitly overrides the
+#' Parquet exports preserve each geometry column's CRS. For lazy input, the
+#' native DuckDB query type is authoritative, including unknown CRS: an R
+#' attribute may be stale after dplyr transformations. `crs` overrides the
 #' active geometry without changing any other geometry column or the input.
 #'
 #' V2 delegates native geometry serialization and row-group statistics to
 #' DuckDB, and supplies one explicit `geo` metadata block at write time. This
 #' preserves the active geometry, writes full PROJJSON definitions, and pairs
-#' unknown CRS with `crs: null` and native `srid:0`. Geometry types are declared
-#' unknown (`geometry_types: []`), as permitted by the specification; actual
+#' known CRS in the native type and inline PROJJSON in the metadata. DuckDB 2.0
+#' cannot construct native `srid:0`: V2 therefore rejects unknown CRS rather
+#' than silently labelling its coordinates CRS84. V1 writes explicit `crs: null`
+#' when unknown. Geometry types are declared unknown (`geometry_types: []`),
+#' as permitted by the specification; actual
 #' types and bounds remain in native row-group statistics. No whole-dataset
 #' bounding box is incorrectly reused in partition files. No post-write file
 #' rewriting or R-side geometry serialization is performed for lazy inputs.
