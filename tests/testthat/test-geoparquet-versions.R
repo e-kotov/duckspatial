@@ -205,3 +205,26 @@ test_that("native unknown CRS is not replaced by a stale duckspatial_df attribut
     geoparquet_version = "V2", quiet = TRUE
   ), "unknown CRS")
 })
+
+test_that("GeoParquet V2 preserves M and ZM coordinates", {
+  conn <- ddbs_temp_conn()
+  for (dim in c("XYM", "XYZM")) {
+    coords <- if (identical(dim, "XYM")) c(1, 2, 3) else c(1, 2, 3, 4)
+    x <- sf::st_sf(
+      id = 1L,
+      geometry = sf::st_sfc(sf::st_point(coords, dim = dim), crs = 4326)
+    )
+    output <- tempfile(fileext = ".parquet")
+    ddbs_write_dataset(
+      x, output, conn = conn, geoparquet_version = "V2", quiet = TRUE
+    )
+    p <- as.character(DBI::dbQuoteString(conn, output))
+    wkt <- DBI::dbGetQuery(conn, paste0(
+      "SELECT ST_AsText(geometry) AS geom FROM read_parquet(", p, ")"
+    ))$geom[[1L]]
+    expect_match(wkt, if (identical(dim, "XYM")) "POINT M" else "POINT ZM",
+                 fixed = TRUE)
+    expect_equal(gp_metadata(conn, output)$version, "2.0.0")
+    unlink(output)
+  }
+})
