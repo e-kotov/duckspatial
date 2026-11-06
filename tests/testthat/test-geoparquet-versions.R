@@ -228,3 +228,19 @@ test_that("GeoParquet V2 preserves M and ZM coordinates", {
     unlink(output)
   }
 })
+
+test_that("legacy storage CRS metadata is retained in GeoParquet V1", {
+  file <- tempfile(fileext = ".duckdb")
+  output <- tempfile(fileext = ".parquet")
+  on.exit(unlink(c(file, output)), add = TRUE)
+  conn <- ddbs_create_conn(file, duckdb_storage_version = "v1.0.0")
+  on.exit(try(ddbs_stop_conn(conn), silent = TRUE), add = TRUE)
+  ddbs_write_table(conn, gp_points(3857), "legacy_points", quiet = TRUE)
+  source <- as_duckspatial_df("legacy_points", conn = conn)
+  expect_equal(attr(source, "crs")$epsg, 3857)
+
+  ddbs_write_dataset(source, output, conn = conn, quiet = TRUE)
+  md <- gp_metadata(conn, output)
+  expect_equal(md$version, "1.0.0")
+  expect_true(is.list(md$columns$geometry$crs))
+})
