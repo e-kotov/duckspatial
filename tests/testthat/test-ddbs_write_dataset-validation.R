@@ -3,11 +3,12 @@
 testthat::skip_on_cran()
 
 test_that("warns when extension and driver mismatch", {
+  output_dir <- withr::local_tempdir()
   conn <- ddbs_temp_conn()
   ds <- ddbs_open_dataset(system.file("spatial/countries.geojson", package = "duckspatial"), conn = conn)
   
-  tmp_file <- tempfile(fileext = ".geojson")
-  on.exit(unlink(tmp_file), add = TRUE)
+  # Shapefile output with this extension is a directory containing sidecars.
+  tmp_file <- file.path(output_dir, "mismatched.geojson")
   
   # .geojson with ESRI Shapefile driver should warn
   expect_warning(
@@ -106,16 +107,16 @@ test_that("errors with helpful message for invalid driver", {
 })
 
 test_that("auto-detects from standard extensions", {
+  output_dir <- withr::local_tempdir()
   conn <- ddbs_temp_conn()
   ds <- ddbs_open_dataset(system.file("spatial/countries.geojson", package = "duckspatial"), conn = conn)
   
-  # Test various extensions
-  ## fgb: it's not deleted on exit, raises a CRAN note of detritus
+  # Include single-file output and a format with sidecars.
   extensions <- c("geojson", "shp")
   
   for (ext in extensions) {
-    tmp_file <- tempfile(fileext = paste0(".", ext))
-    on.exit(unlink(tmp_file), add = TRUE)
+    # The enclosing directory owns every output, including Shapefile sidecars.
+    tmp_file <- file.path(output_dir, paste0("dataset.", ext))
     
     # Should work without specifying gdal_driver
     expect_no_error(
