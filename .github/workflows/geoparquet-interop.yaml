@@ -1,0 +1,42 @@
+name: GeoParquet interoperability
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: release
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: local::.
+          needs: check
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install independent Parquet reader
+        run: python -m pip install 'pyarrow>=20'
+      - name: Generate V1 and V2 files using duckspatial
+        shell: bash
+        run: |
+          Rscript - <<'RS'
+          library(duckspatial)
+          con <- DBI::dbConnect(duckdb::duckdb(dbdir = ":memory:"))
+          x <- sf::st_sf(
+            id = 1:2,
+            geometry = sf::st_sfc(sf::st_point(c(1, 2)),
+                                  sf::st_point(c(3, 4)), crs = 4326)
+          )
+          ddbs_write_dataset(x, "gp-v1.parquet", conn = con,
+                             crs = NA, quiet = TRUE)
+          ddbs_write_dataset(x, "gp-v2.parquet", conn = con,
+                             geoparquet_version = "V2", quiet = TRUE)
+          DBI::dbDisconnect(con, shutdown = TRUE)
+          RS
+      - name: Independently verify GeoParquet metadata and logical types
+        run: python tools/validate_geoparquet.py
