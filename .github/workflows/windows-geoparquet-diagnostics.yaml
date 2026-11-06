@@ -86,8 +86,9 @@ jobs:
         shell: pwsh
         run: |
           @'
-          # Deliberately load only DBI and duckdb: this reproduces a native
-          # disconnect failure independently of duckspatial and testthat.
+          # Do not load duckspatial or testthat. Compare the DBI/duckdb-only
+          # control with sf and a separate live spatial connection to identify
+          # which native-library/connection combination triggers the failure.
           library(DBI)
           library(duckdb)
           mode <- commandArgs(trailingOnly = TRUE)[[1L]]
@@ -95,30 +96,67 @@ jobs:
             cat(format(Sys.time(), "%H:%M:%OS3"), ..., "\n")
             flush(stdout())
           }
+          if (mode %in% c("sf-loaded", "sf-spatial-anchor", "nested-errors", "native-stack")) library(sf)
+          if (mode == "native-stack") {
+            for (pkg in c("arrow", "geoarrow", "nanoarrow", "wk", "dplyr", "dbplyr")) {
+              loadNamespace(pkg)
+            }
+          }
           print(sessionInfo())
+          anchor <- NULL
+          if (mode %in% c("spatial-anchor", "sf-spatial-anchor", "nested-errors", "native-stack")) {
+            checkpoint("SPATIAL ANCHOR CONNECT")
+            anchor <- dbConnect(duckdb(shared_home = FALSE))
+            dbExecute(anchor, "INSTALL spatial; LOAD spatial;")
+          }
           checkpoint("CONNECT", mode)
           conn <- dbConnect(duckdb(shared_home = FALSE))
           if (mode == "loaded-spatial") {
             checkpoint("INSTALL AND LOAD SPATIAL")
             dbExecute(conn, "INSTALL spatial; LOAD spatial;")
           }
-          if (mode != "control") {
+          install_errors <- list()
+          if (mode %in% c("nested-errors", "native-stack")) {
+            fail_install <- function(conn) {
+              tryCatch(dbExecute(conn, "INSTALL nonexistent_extension_xyz;"),
+                error = function(core_error) {
+                  install_errors$core <<- core_error
+                  tryCatch(dbExecute(conn, "INSTALL nonexistent_extension_xyz FROM community;"),
+                    error = function(community_error) {
+                      install_errors$community <<- community_error
+                      NULL
+                    })
+                })
+              cli::cli_abort(c("Failed to install nonexistent_extension_xyz.",
+                "x" = conditionMessage(install_errors$core),
+                "x" = conditionMessage(install_errors$community)))
+            }
+            err <- tryCatch(fail_install(conn), error = identity)
+            stopifnot(inherits(err, "error"), length(install_errors) == 2L)
+            checkpoint("EXPECTED NESTED R ERROR", conditionMessage(err))
+          } else if (mode != "control") {
             for (sql in c("INSTALL nonexistent_extension_xyz;",
                           "INSTALL nonexistent_extension_xyz FROM community;")) {
               checkpoint("SQL ENTER", sql)
               err <- tryCatch({ dbExecute(conn, sql); NULL }, error = identity)
               stopifnot(inherits(err, "error"))
+              install_errors[[length(install_errors) + 1L]] <- err
               checkpoint("EXPECTED R ERROR", conditionMessage(err))
             }
           }
           checkpoint("DISCONNECT ENTER")
           dbDisconnect(conn)
           checkpoint("DISCONNECT LEAVE")
+          if (!is.null(anchor)) {
+            checkpoint("SPATIAL ANCHOR DISCONNECT ENTER")
+            dbDisconnect(anchor)
+            checkpoint("SPATIAL ANCHOR DISCONNECT LEAVE")
+          }
           gc()
           checkpoint("R EXIT REQUEST")
           '@ | Set-Content -Path .github/windows-native-install-repro.R
           $failed = $false
-          foreach ($mode in @("control", "failed-install", "loaded-spatial")) {
+          foreach ($mode in @("control", "failed-install", "loaded-spatial", "sf-loaded", "spatial-anchor", "sf-spatial-anchor", "nested-errors", "native-stack")) {
             Rscript .github/windows-native-install-repro.R $mode 2>&1 | Tee-Object -FilePath "diagnostics/native-$mode.log"
             $code = $LASTEXITCODE
             "PROCESS EXIT: $code" | Tee-Object -FilePath "diagnostics/native-$mode.log" -Append
