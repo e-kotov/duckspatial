@@ -1,0 +1,78 @@
+name: Windows native exit dump capture
+
+on:
+  push:
+    branches: [debug/windows-exit-validation-20261106]
+    paths: [.github/windows-exit-capture.py, .github/workflows/windows-exit-capture.yaml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Locate the native Windows debugger
+        timeout-minutes: 5
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force diagnostics | Out-Null
+          $cdb = 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\cdb.exe'
+          if (-not (Test-Path $cdb)) {
+            $sdk = Get-ItemProperty HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* |
+              Where-Object { $_.DisplayName -match 'Windows Software Development Kit' -and $_.BundleCachePath } |
+              Sort-Object DisplayVersion -Descending | Select-Object -First 1
+            if (-not $sdk) { throw 'Windows SDK cached installer unavailable' }
+            $install = Start-Process -FilePath $sdk.BundleCachePath -ArgumentList '/features OptionId.WindowsDesktopDebuggers /q /norestart' -Wait -PassThru
+            if ($install.ExitCode -notin @(0, 3010)) { throw "Debugger installation failed: $($install.ExitCode)" }
+          }
+          if (-not (Test-Path $cdb)) { throw 'CDB not installed' }
+          "CAPTURE_CDB=$cdb" >> $env:GITHUB_ENV
+          & $cdb -version | Tee-Object diagnostics/cdb-version.log
+          Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version, BuildNumber |
+            ConvertTo-Json | Set-Content diagnostics/windows-version.json
+          git rev-parse HEAD | Set-Content diagnostics/source-sha.txt
+      - uses: r-lib/actions/setup-r@v2
+        timeout-minutes: 5
+        with:
+          r-version: '4.6.2'
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        timeout-minutes: 6
+        with:
+          packages: any::DBI, any::duckdb
+          dependencies: 'c("Depends", "Imports", "LinkingTo")'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install process inspection helper
+        run: python -m pip install psutil
+      - name: Verify the reproduced runtime
+        shell: Rscript {0}
+        run: |
+          stopifnot(as.character(getRversion()) == '4.6.2')
+          stopifnot(as.character(packageVersion('duckdb')) == '2.0.0')
+          stopifnot(as.character(packageVersion('DBI')) == '1.3.0')
+          writeLines(capture.output(sessionInfo()), 'diagnostics/runtime.log')
+          writeLines(normalizePath(file.path(R.home('bin'), 'Rscript.exe'), winslash = '/'),
+                     'diagnostics/native-rscript-path.txt')
+      - name: Reproduce and capture before terminating a hung process
+        timeout-minutes: 13
+        shell: pwsh
+        run: |
+          python .github/windows-exit-capture.py
+          exit $LASTEXITCODE
+      - name: Preserve dumps, binaries, native stacks and process results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-native-exit-capture-${{ github.run_attempt }}
+          path: |
+            diagnostics
+            !diagnostics/symbols
+          if-no-files-found: error
+          retention-days: 30
