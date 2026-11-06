@@ -136,7 +136,8 @@ when the output must be readable by older DuckDB versions.
 
 Parquet exports preserve CRS metadata for each geometry column. For lazy
 inputs, the DuckDB query type is authoritative, even when CRS is unknown:
-the R attribute may be stale after a dplyr transformation.
+the R attribute may be stale after a dplyr transformation. In legacy DuckDB
+storage mode only, the R attribute may supply CRS missing from native types.
 \code{crs} overrides the active geometry without reprojecting or changing
 other geometry columns.
 
