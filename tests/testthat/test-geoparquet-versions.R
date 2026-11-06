@@ -181,3 +181,27 @@ test_that("ordinary nested fields named GEOMETRY are not rejected", {
   ))
   expect_equal(gp_metadata(conn, output)$version, "1.0.0")
 })
+
+test_that("native unknown CRS is not replaced by a stale duckspatial_df attribute", {
+  conn <- ddbs_temp_conn()
+  DBI::dbExecute(conn, paste0(
+    "CREATE TEMP TABLE gp_stale AS SELECT 1 AS id, ",
+    "ST_Point(10, 20)::GEOMETRY('EPSG:3857') AS geometry"
+  ))
+  source <- as_duckspatial_df("gp_stale", conn = conn)
+  cleared <- dplyr::mutate(
+    source, geometry = dbplyr::sql("CAST(geometry AS GEOMETRY)")
+  )
+  # dplyr's duckspatial method retains the old R CRS despite the new SQL type.
+  expect_equal(attr(cleared, "crs")$epsg, 3857)
+  output <- tempfile(fileext = ".parquet")
+  on.exit(unlink(output), add = TRUE)
+
+  ddbs_write_dataset(cleared, output, conn = conn, quiet = TRUE)
+  expect_null(gp_metadata(conn, output)$columns$geometry$crs)
+  unlink(output)
+  expect_error(ddbs_write_dataset(
+    cleared, output, conn = conn,
+    geoparquet_version = "V2", quiet = TRUE
+  ), "unknown CRS")
+})
