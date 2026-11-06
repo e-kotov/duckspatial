@@ -247,3 +247,27 @@ test_that("legacy storage CRS metadata is retained in GeoParquet V1", {
   expect_equal(md$version, "1.0.0")
   expect_true(is.list(md$columns$geometry$crs))
 })
+
+test_that("all-NULL geometry columns export in both versions with spatial ordering", {
+  conn <- ddbs_temp_conn()
+  DBI::dbExecute(conn, paste0(
+    "CREATE TEMP TABLE gp_all_null AS SELECT id, ",
+    "NULL::GEOMETRY('EPSG:4326') AS geometry FROM range(1, 4) t(id)"
+  ))
+  source <- dplyr::tbl(conn, "gp_all_null")
+  for (version in c("V1", "V2")) {
+    output <- tempfile(fileext = ".parquet")
+    expect_no_error(ddbs_write_dataset(
+      source, output, conn = conn, geoparquet_version = version,
+      parquet_spatial_order = TRUE, quiet = TRUE
+    ))
+    md <- gp_metadata(conn, output)
+    expect_equal(md$primary_column, "geometry")
+    expect_equal(md$version, if (version == "V1") "1.0.0" else "2.0.0")
+    p <- as.character(DBI::dbQuoteString(conn, output))
+    expect_equal(DBI::dbGetQuery(conn, paste0(
+      "SELECT count(*) AS n FROM read_parquet(", p, ")"
+    ))$n[[1]], 3)
+    unlink(output)
+  }
+})
