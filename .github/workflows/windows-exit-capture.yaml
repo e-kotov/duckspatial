@@ -1,10 +1,12 @@
 name: Windows native exit dump capture
 
 on:
+  workflow_dispatch:
   push:
     branches: [debug/windows-exit-validation-20261106]
-    paths: [.github/windows-exit-capture.py, .github/workflows/windows-exit-capture.yaml]
-  workflow_dispatch:
+    paths:
+      - '.github/windows-exit-capture.py'
+      - '.github/workflows/windows-exit-capture.yaml'
 
 permissions:
   contents: read

@@ -25,6 +25,7 @@ OUT.mkdir(exist_ok=True)
 (OUT / "symbols").mkdir(exist_ok=True)
 sys.dont_write_bytecode = True
 CDB = Path(os.environ["CAPTURE_CDB"])
+PACKAGE_MODE = os.environ.get("CAPTURE_CASES") == "package"
 
 
 def clean_environment() -> dict[str, str]:
@@ -40,6 +41,7 @@ def clean_environment() -> dict[str, str]:
         "RTOOLS45_HOME", "NOT_CRAN", "_R_CHECK_SYSTEM_CLOCK_", "_R_INSTALL_TIME_PATCHES_",
         "RSPM", "RENV_CONFIG_REPOS_OVERRIDE", "R_LIB_FOR_PAK",
         "OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
+        "CI", "GITHUB_ACTIONS",
         "LANG", "LC_ALL", "TZ",
     }
     return {k: v for k, v in os.environ.items() if k.upper() in allowed}
@@ -124,6 +126,77 @@ def run_debugger(command: list[str], log: Path, timeout: int) -> dict:
     return result
 
 
+def write_capture_script(script: Path, dump: Path, full: bool) -> None:
+    script.write_text(
+        '.echo NATIVE_CAPTURE_BEGIN\n'
+        f'.dump /o /{"mA" if full else "mFhut"} "{dump.as_posix()}"\n'
+        '.echo THREAD_STACKS\n~* kv 100\n.echo MODULES\nlmv\n'
+        '.echo CRITICAL_SECTIONS\n!ntsdexts.locks\n'
+        '.echo NATIVE_CAPTURE_COMPLETE\nqd\n', encoding="utf-8")
+
+
+def capture_command(pid: int, debugger_log: Path, script: Path) -> list[str]:
+    # -pd made this CDB build exit before attachment with "The system does not
+    # support detach on exit". Noninvasive -pv plus explicit qd leaves R alive.
+    return [str(CDB), "-pv", "-p", str(pid), "-y", str(OUT / "symbols"),
+            "-logo", str(debugger_log), "-cf", str(script)]
+
+
+def verify_debugger() -> None:
+    """Validate dump creation and safe detach before waiting for a real hang."""
+    folder = OUT / "debugger-preflight"
+    folder.mkdir(exist_ok=True)
+    dump = folder / "sleeping-child.dmp"
+    script = folder / "capture.cdb"
+    log = folder / "capture.log"
+    heartbeat = folder / "heartbeat.txt"
+    write_capture_script(script, dump, full=True)
+    child_code = ("import pathlib, sys, time\n"
+                  "p=pathlib.Path(sys.argv[1])\n"
+                  "while True:\n p.write_text(str(time.monotonic()))\n time.sleep(0.2)\n")
+    child = subprocess.Popen([sys.executable, "-c", child_code, str(heartbeat)],
+                             env=ENV, stdin=subprocess.DEVNULL,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        result = run_debugger(capture_command(child.pid, log, script),
+                              folder / "capture-console.log", 60)
+        text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
+        result.update(pid=child.pid,
+                      dump_write_confirmed="Dump successfully written" in text,
+                      capture_commands_completed="NATIVE_CAPTURE_COMPLETE" in text,
+                      child_alive_after_detach=child.poll() is None)
+        before = heartbeat.read_text() if heartbeat.exists() else ""
+        deadline = time.monotonic() + 3
+        result["child_resumed_after_detach"] = False
+        while time.monotonic() < deadline and child.poll() is None:
+            time.sleep(0.1)
+            after = heartbeat.read_text() if heartbeat.exists() else ""
+            if after and after != before:
+                result["child_resumed_after_detach"] = True
+                break
+        if dump.exists():
+            with dump.open("rb") as handle:
+                result["minidump_magic_valid"] = handle.read(4) == b"MDMP"
+            result.update(size=dump.stat().st_size, sha256=sha256(dump))
+            # Synthetic preflight memory is not evidence of the R hang.
+            dump.unlink()
+        save_json(folder / "result.json", result)
+        if not (result.get("exit_code") == 0 and all(result.get(key) for key in (
+            "dump_write_confirmed", "capture_commands_completed",
+            "child_alive_after_detach", "child_resumed_after_detach", "minidump_magic_valid",
+        ))):
+            raise RuntimeError("CDB preflight did not write and safely detach from a valid dump")
+        print("CDB PREFLIGHT: dump written, validated, and child remains alive", flush=True)
+    finally:
+        if child.poll() is None:
+            child.terminate()
+            try:
+                child.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                child.kill()
+                child.wait(timeout=5)
+
+
 captures = []
 current_label = ""
 capture_started = time.monotonic()
@@ -158,17 +231,11 @@ def capture_process(proc: subprocess.Popen) -> None:
         full = pid == targets[0]
         dump = folder / f"pid-{pid}.dmp"
         script = folder / f"pid-{pid}-capture.cdb"
-        script.write_text(
-            '.echo NATIVE_CAPTURE_BEGIN\n'
-            f'.dump /o /{"mA" if full else "mFhut"} "{dump.as_posix()}"\n'
-            '.echo THREAD_STACKS\n~* kv 100\n.echo MODULES\nlmv\n'
-            '.echo CRITICAL_SECTIONS\n!ntsdexts.locks\n'
-            '.echo NATIVE_CAPTURE_COMPLETE\nqd\n', encoding="utf-8")
+        write_capture_script(script, dump, full)
         binaries = save_native_binaries(pid, folder)
         debugger_log = folder / f"pid-{pid}-capture.log"
         capture = run_debugger(
-            [str(CDB), "-pv", "-pd", "-p", str(pid), "-y", str(OUT / "symbols"),
-             "-logo", str(debugger_log), "-cf", str(script)],
+            capture_command(pid, debugger_log, script),
             folder / f"pid-{pid}-capture-console.log", 90)
         capture.update(pid=pid, is_r_process=pid == r_pid,
                        dump_kind="full-accessible-memory" if full else "thread-module-handle",
@@ -207,7 +274,8 @@ def capture_before_kill(proc: subprocess.Popen) -> str:
 spec = importlib.util.spec_from_file_location("supervisor", ROOT / ".github/windows-test-supervisor.py")
 supervisor = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(supervisor)
-supervisor.RUNNER = ROOT / ".github/windows-native-geometry.R"
+supervisor.RUNNER = ROOT / (".github/windows-test-diagnostics.R" if PACKAGE_MODE
+                            else ".github/windows-native-geometry.R")
 supervisor.subprocess = SimpleNamespace(
     Popen=lambda *args, **kwargs: subprocess.Popen(*args, env=ENV, **kwargs),
     run=lambda *args, **kwargs: subprocess.run(*args, env=ENV, **kwargs),
@@ -221,29 +289,45 @@ save_json(OUT / "capture-tooling.json", {
     "reproducer_sha256": sha256(supervisor.RUNNER),
     "supervisor_sha256": sha256(ROOT / ".github/windows-test-supervisor.py"),
     "environment_variable_names": sorted(ENV),
+    "logical_cpu_count": psutil.cpu_count(),
+    "physical_cpu_count": psutil.cpu_count(logical=False),
+    "package_mode": PACKAGE_MODE,
     "note": "R/CDB receive only allowlisted runtime variables, never CI credentials.",
 })
 
+verify_debugger()
 results = []
-# Reuse the exact existing reproduction and a paired one-thread control. Do not
-# change DuckDB SQL, add a sleep in R, or globally reduce production threads.
-for repetition in range(1, int(os.environ.get("CAPTURE_RAW_ATTEMPTS", "3")) + 1):
-    current_label = "raw--all--base--t0"
-    if repetition > 1:
-        previous = OUT / f"attempt-{repetition - 1}"
-        previous.mkdir(exist_ok=True)
-        for path in list(OUT.glob(current_label + "*")):
-            shutil.move(str(path), previous / path.name)
-    result = supervisor.invoke(current_label, limit=180, quit_grace=30)
-    result["attempt"] = repetition
-    results.append(result)
-    save_json(OUT / "native-exit-results.json", results)
-    if captures:
-        break
+if PACKAGE_MODE:
+    # Use the exact PR's original diagnostic runner and real package tests.
+    # The latest diagnostic had reproduced on this file; fall back to the full
+    # suite only if it does not hang in isolation on this runner.
+    for current_label, files, limit in (
+        ("ddbs_open_dataset", ["ddbs_open_dataset"], 180),
+        ("full-suite", None, 900),
+    ):
+        results.append(supervisor.invoke(current_label, files=files, limit=limit, quit_grace=30))
+        save_json(OUT / "native-exit-results.json", results)
+        if captures:
+            break
+else:
+    # Reuse the exact existing reproduction and a paired one-thread control.
+    for repetition in range(1, int(os.environ.get("CAPTURE_RAW_ATTEMPTS", "3")) + 1):
+        current_label = "raw--all--base--t0"
+        if repetition > 1:
+            previous = OUT / f"attempt-{repetition - 1}"
+            previous.mkdir(exist_ok=True)
+            for path in list(OUT.glob(current_label + "*")):
+                shutil.move(str(path), previous / path.name)
+        result = supervisor.invoke(current_label, limit=180, quit_grace=30)
+        result["attempt"] = repetition
+        results.append(result)
+        save_json(OUT / "native-exit-results.json", results)
+        if captures:
+            break
 
-current_label = "raw--all--base--t1"
-results.append(supervisor.invoke(current_label, limit=180, quit_grace=30))
-save_json(OUT / "native-exit-results.json", results)
+    current_label = "raw--all--base--t1"
+    results.append(supervisor.invoke(current_label, limit=180, quit_grace=30))
+    save_json(OUT / "native-exit-results.json", results)
 
 # Symbolic analysis happens after preservation and termination, against the
 # saved file. Network/symbol delays cannot prevent the initial native capture.
