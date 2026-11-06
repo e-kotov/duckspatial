@@ -12,7 +12,9 @@ permissions:
 jobs:
   capture:
     runs-on: windows-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
+    env:
+      CAPTURE_RAW_ATTEMPTS: '30'
     steps:
       # The diagnostic branch omits unused, unconfigured sync2 gitlinks so
       # checkout can remove its temporary credentials before capture begins.
@@ -63,7 +65,7 @@ jobs:
           writeLines(normalizePath(file.path(R.home('bin'), 'Rscript.exe'), winslash = '/'),
                      'diagnostics/native-rscript-path.txt')
       - name: Reproduce and capture before terminating a hung process
-        timeout-minutes: 13
+        timeout-minutes: 18
         shell: pwsh
         run: |
           python .github/windows-exit-capture.py

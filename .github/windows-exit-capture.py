@@ -37,6 +37,9 @@ def clean_environment() -> dict[str, str]:
         "PROCESSOR_ARCHITECTURE", "PROCESSOR_IDENTIFIER", "NUMBER_OF_PROCESSORS",
         "R_HOME", "R_ARCH", "R_LIBS", "R_LIBS_USER", "R_LIBS_SITE", "R_USER",
         "R_ENVIRON", "R_ENVIRON_USER", "R_PROFILE", "R_PROFILE_USER",
+        "RTOOLS45_HOME", "NOT_CRAN", "_R_CHECK_SYSTEM_CLOCK_", "_R_INSTALL_TIME_PATCHES_",
+        "RSPM", "RENV_CONFIG_REPOS_OVERRIDE", "R_LIB_FOR_PAK",
+        "OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
         "LANG", "LC_ALL", "TZ",
     }
     return {k: v for k, v in os.environ.items() if k.upper() in allowed}
@@ -224,7 +227,7 @@ save_json(OUT / "capture-tooling.json", {
 results = []
 # Reuse the exact existing reproduction and a paired one-thread control. Do not
 # change DuckDB SQL, add a sleep in R, or globally reduce production threads.
-for repetition in range(1, 4):
+for repetition in range(1, int(os.environ.get("CAPTURE_RAW_ATTEMPTS", "3")) + 1):
     current_label = "raw--all--base--t0"
     if repetition > 1:
         previous = OUT / f"attempt-{repetition - 1}"
