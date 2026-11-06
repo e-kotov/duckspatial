@@ -21,6 +21,9 @@ gp_type <- function(conn, path, column = "geometry") {
 }
 
 gp_points <- function(crs = 3857) {
+  if (length(crs) == 1L && is.atomic(crs) && is.na(crs)) {
+    crs <- sf::st_crs(NA)
+  }
   sf::st_sf(
     id = c(1L, 2L, 3L),
     geometry = sf::st_sfc(
@@ -55,7 +58,7 @@ test_that("GeoParquet V1 retains both known and unknown sf geometry CRS", {
   x <- gp_points(3857)
   x$other <- sf::st_sfc(
     sf::st_point(c(1, 2)), sf::st_point(c(3, 4)),
-    sf::st_point(c(5, 6)), crs = NA
+    sf::st_point(c(5, 6)), crs = sf::st_crs(NA)
   )
   output <- tempfile(fileext = ".parquet")
   on.exit(unlink(output), add = TRUE)
