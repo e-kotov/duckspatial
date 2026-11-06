@@ -81,11 +81,56 @@ jobs:
           .windows_checkpoint("R EXIT REQUEST: status=", status)
           quit(save = "no", status = status)
           '@ | Set-Content -Path .github/windows-test-diagnostics.R
+      - name: Independent DuckDB install and disconnect reproduction
+        timeout-minutes: 5
+        shell: pwsh
+        run: |
+          @'
+          # Deliberately load only DBI and duckdb: this reproduces a native
+          # disconnect failure independently of duckspatial and testthat.
+          library(DBI)
+          library(duckdb)
+          mode <- commandArgs(trailingOnly = TRUE)[[1L]]
+          checkpoint <- function(...) {
+            cat(format(Sys.time(), "%H:%M:%OS3"), ..., "\n")
+            flush(stdout())
+          }
+          print(sessionInfo())
+          checkpoint("CONNECT", mode)
+          conn <- dbConnect(duckdb(shared_home = FALSE))
+          if (mode == "loaded-spatial") {
+            checkpoint("INSTALL AND LOAD SPATIAL")
+            dbExecute(conn, "INSTALL spatial; LOAD spatial;")
+          }
+          if (mode != "control") {
+            for (sql in c("INSTALL nonexistent_extension_xyz;",
+                          "INSTALL nonexistent_extension_xyz FROM community;")) {
+              checkpoint("SQL ENTER", sql)
+              err <- tryCatch({ dbExecute(conn, sql); NULL }, error = identity)
+              stopifnot(inherits(err, "error"))
+              checkpoint("EXPECTED R ERROR", conditionMessage(err))
+            }
+          }
+          checkpoint("DISCONNECT ENTER")
+          dbDisconnect(conn)
+          checkpoint("DISCONNECT LEAVE")
+          gc()
+          checkpoint("R EXIT REQUEST")
+          '@ | Set-Content -Path .github/windows-native-install-repro.R
+          $failed = $false
+          foreach ($mode in @("control", "failed-install", "loaded-spatial")) {
+            Rscript .github/windows-native-install-repro.R $mode 2>&1 | Tee-Object -FilePath "diagnostics/native-$mode.log"
+            $code = $LASTEXITCODE
+            "PROCESS EXIT: $code" | Tee-Object -FilePath "diagnostics/native-$mode.log" -Append
+            if ($code -ne 0) { $failed = $true }
+          }
+          if ($failed) { exit 1 }
       - name: New GeoParquet tests in isolation
+        if: ${{ !cancelled() }}
         timeout-minutes: 10
         shell: pwsh
         run: |
-          Rscript .github/windows-test-diagnostics.R geoparquet-versions 2>&1 | Tee-Object -FilePath diagnostics/geoparquet-console.log
+          Rscript .github/windows-test-diagnostics.R geoparquet 2>&1 | Tee-Object -FilePath diagnostics/geoparquet-console.log
           $code = $LASTEXITCODE
           "PROCESS EXIT: $code" | Tee-Object -FilePath diagnostics/geoparquet-console.log -Append
           exit $code
@@ -107,6 +152,14 @@ jobs:
           $code = $LASTEXITCODE
           "PROCESS EXIT: $code" | Tee-Object -FilePath diagnostics/full-suite-console.log -Append
           exit $code
+      - name: Collect Windows native crash events
+        if: always()
+        shell: pwsh
+        run: |
+          Get-WinEvent -FilterHashtable @{LogName = 'Application'; StartTime = (Get-Date).AddHours(-1)} -ErrorAction SilentlyContinue |
+            Where-Object { $_.Id -in 1000, 1001 } |
+            Format-List TimeCreated, Id, ProviderName, Message |
+            Out-File -FilePath diagnostics/windows-crash-events.log
       - name: Upload Windows diagnostics
         if: always()
         uses: actions/upload-artifact@v4

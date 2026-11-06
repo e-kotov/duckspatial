@@ -48,7 +48,8 @@ test_that("default GeoParquet is V1 and retains an explicit unknown CRS", {
   expect_equal(md$primary_column, "geometry")
 
   # Read back through the GeoParquet-aware reader, not only the JSON footer.
-  result <- ddbs_open_dataset(output, conn = conn)
+  expect_warning(result <- ddbs_open_dataset(output, conn = conn),
+                 "CRS could not be auto-detected")
   expect_true(is.na(ddbs_crs(result)))
   expect_equal(dplyr::count(result) |> dplyr::pull(n), 3)
 })

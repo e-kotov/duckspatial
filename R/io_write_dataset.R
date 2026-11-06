@@ -6,8 +6,8 @@
 #' formats, or can be specified explicitly via `gdal_driver`.
 #' 
 #' Persistent DuckDB database files created by duckspatial use **Native 
-#' Spatial Storage** (`storage_version = "v1.5.0"`) by default so CRS metadata is 
-#' retained in native `GEOMETRY` columns. These files require DuckDB >= 1.5.0 
+#' Spatial Storage** (`storage_version = "v2.0.0"`) by default so CRS metadata is
+#' retained in native `GEOMETRY` columns. These files require DuckDB >= 2.0.0
 #' to open; use **Legacy Compatibility** (`storage_version = "v1.0.0"`) 
 #' when the output must be readable by older DuckDB versions.
 #'
@@ -47,8 +47,11 @@
 #' @param options Named list of additional options passed to `COPY`. For Parquet,
 #'   names are case-insensitive. An existing `GEOPARQUET_VERSION` option is
 #'   honoured unless it conflicts with an explicitly supplied
-#'   `geoparquet_version`. For V2, `KV_METADATA` must be a named list of strings;
+#'   `geoparquet_version`. For V1 and V2, `KV_METADATA` must be a named list of strings;
 #'   its `geo` key is reserved. Other options override the convenience arguments.
+#'   Supply `PARTITION_BY` as column names, a parenthesized SQL identifier list,
+#'   or use `partitioning`. Spatial ordering requires `PRESERVE_ORDER = TRUE`;
+#'   a conflicting option is rejected.
 #' @param partitioning Character vector of columns to partition by (Parquet/CSV only).
 #' @param parquet_compression Compression codec for Parquet.
 #' @param parquet_row_group_size Row group size for Parquet.
@@ -59,9 +62,9 @@
 #'   \url{https://duckdb.org/docs/internals/storage} for more information on
 #'   DuckDB storage versions and compatibility.
 #'   \itemize{
-#'     \item \code{"v1.5.0"} (\strong{Native Spatial Storage}, Default): Preserves
+#'     \item \code{"v2.0.0"} (\strong{Native Spatial Storage}, Default): Preserves
 #'           CRS metadata in native DuckDB \code{GEOMETRY} columns. Requires
-#'           DuckDB >= 1.5.0 to open the file.
+#'           DuckDB >= 2.0.0 to open the file.
 #'     \item \code{"v1.0.0"} (\strong{Legacy Compatibility}): Creates
 #'           files readable by older DuckDB versions (>= 1.0.0). Persists CRS
 #'           metadata in duckspatial-managed column comments (a convention not
@@ -77,7 +80,8 @@
 #' @param parquet_spatial_order Logical. If `TRUE`, order Parquet rows by a
 #'   Hilbert index of the active geometry within the dataset extent. Null and
 #'   empty geometries sort last. This adds an extent scan and an external sort
-#'   in DuckDB; it does not collect the dataset into R. Default is `FALSE`.
+#'   in DuckDB; it does not collect the dataset into R. Requires a single output
+#'   file (no partitioning). Default is `FALSE`.
 #' @param parquet_compression_level Optional integer ZSTD compression level.
 #'   Requires `parquet_compression = "zstd"` (or the equivalent COPY option).
 #'
@@ -100,10 +104,17 @@
 #' types and bounds remain in native row-group statistics. No whole-dataset
 #' bounding box is incorrectly reused in partition files. No post-write file
 #' rewriting or R-side geometry serialization is performed for lazy inputs.
+#' V1 supports XY and XYZ geometries. Measured geometries (XYM or XYZM)
+#' require V2; V1 rejects them without dropping their measures. All geometry
+#' columns must be top-level. Column names must be unique ignoring ASCII case,
+#' as required by DuckDB's identifier rules.
 #'
 #' Spatial ordering, ZSTD compression, and a row-group size around 100000 are
 #' optional distribution optimizations, not requirements of GeoParquet 2.0.
 #' Defaults are not changed automatically when selecting V2.
+#' Spatial ordering currently requires a single output file. DuckDB does not
+#' preserve the requested order in partitioned output, so combining
+#' `parquet_spatial_order = TRUE` with `partitioning` or `PARTITION_BY` is rejected.
 #'
 #' @return The `path` invisibly.
 #' 

@@ -19,30 +19,22 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - name: Install independent Parquet reader
-        run: python -m pip install 'pyarrow>=20'
+      - name: Install independent Parquet and geometry readers
+        run: python -m pip install 'pyarrow>=26' 'shapely>=2.1' pyproj 'geoparquet-validator>=0.3.1'
       - name: Generate V1 and V2 files using duckspatial
+        run: Rscript tools/generate_geoparquet_fixtures.R
+      - name: Independently verify values, CRS, dimensions and row-group statistics
+        run: python tools/validate_geoparquet.py
+      - name: Validate V1 and V2 against GeoParquet core conformance rules
         shell: bash
         run: |
-          Rscript - <<'RS'
-          library(duckspatial)
-          con <- DBI::dbConnect(duckdb::duckdb(dbdir = ":memory:"))
-          x <- sf::st_sf(
-            id = 1:2,
-            geometry = sf::st_sfc(sf::st_point(c(1, 2)),
-                                  sf::st_point(c(3, 4)), crs = 4326)
-          )
-          ddbs_write_dataset(x, "gp-v1.parquet", conn = con,
-                             crs = NA, quiet = TRUE)
-          ddbs_write_dataset(x, "gp-v2.parquet", conn = con,
-                             geoparquet_version = "V2", quiet = TRUE)
-          DBI::dbDisconnect(con, shutdown = TRUE)
-          RS
-      - name: Independently verify GeoParquet metadata and logical types
-        run: python tools/validate_geoparquet.py
-      - name: Install independent GeoParquet specification validator
-        run: python -m pip install 'geoparquet-validator>=0.2.0'
-      - name: Validate V1 and V2 against GeoParquet core conformance rules
-        run: |
-          geoparquet-validator check gp-v1.parquet --class core
-          geoparquet-validator check gp-v2.parquet --class core
+          while IFS= read -r -d '' file; do
+            geoparquet-validator check "$file" --class core
+          done < <(find geoparquet-interop -type f -name '*.parquet' -print0)
+      - name: Preserve interoperability fixtures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: geoparquet-interop
+          path: geoparquet-interop
+          if-no-files-found: warn

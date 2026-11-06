@@ -81,7 +81,15 @@ ddbs_geoparquet_projjson <- function(crs) {
 ddbs_geoparquet_cast <- function(expr, crs, conn, version) {
   # V1 uses ordinary WKB BLOB columns and explicit geo metadata.
   if (version == "V1") {
-    return(paste0("ST_AsWKB(CAST(", expr, " AS GEOMETRY))"))
+    # GeoParquet 1.0 permits XY/XYZ, but not measured WKB. Check while
+    # streaming the COPY query rather than scanning the input a second time.
+    geom <- paste0("CAST(", expr, " AS GEOMETRY)")
+    message <- DBI::dbQuoteString(conn, paste0(
+      "GeoParquet 1.0 does not support measured (M/ZM) geometries; ",
+      "use geoparquet_version = 'V2'."
+    ))
+    return(paste0("ST_AsWKB(CASE WHEN ST_HasM(", geom, ") THEN error(",
+                  message, ") ELSE ", geom, " END)"))
   }
   if (is.na(crs) && version == "V2") {
     # DuckDB 2.0 cannot construct GEOMETRY('srid:0'). An unqualified
@@ -157,6 +165,30 @@ ddbs_geoparquet_copy_options <- function(conn, options) {
 }
 
 #' @noRd
+ddbs_geoparquet_partition_names <- function(partitioning) {
+  if (!is.character(partitioning) || length(partitioning) != 1L ||
+      is.na(partitioning)) return(partitioning)
+  text <- trimws(as.character(partitioning))
+  if (!startsWith(text, "(")) return(partitioning)
+  # Older callers supplied COPY's parenthesized identifier list. Parse only
+  # identifiers, so the usual column/geometry validation still applies.
+  identifier <- paste0('\"(?:[^\"]|\"\")*\"|',
+                       '(?:[A-Za-z_]|[^\\x00-\\x7F])',
+                       '(?:[A-Za-z0-9_$]|[^\\x00-\\x7F])*')
+  pattern <- paste0("^\\([[:space:]]*(?:", identifier,
+                    ")(?:[[:space:]]*,[[:space:]]*(?:", identifier,
+                    "))*[[:space:]]*\\)$")
+  if (!grepl(pattern, text, perl = TRUE)) {
+    cli::cli_abort("{.code options$PARTITION_BY} must be column names or a parenthesized column-name list.")
+  }
+  tokens <- regmatches(text, gregexpr(identifier, text, perl = TRUE))[[1L]]
+  vapply(tokens, function(token) {
+    if (!startsWith(token, '\"')) return(token)
+    gsub('\"\"', '\"', substr(token, 2L, nchar(token) - 1L), fixed = TRUE)
+  }, character(1), USE.NAMES = FALSE)
+}
+
+#' @noRd
 ddbs_write_geoparquet <- function(data, path, conn, overwrite, crs, options,
                                   partitioning, compression, row_group_size,
                                   quiet, version, version_explicit,
@@ -171,19 +203,25 @@ ddbs_write_geoparquet <- function(data, path, conn, overwrite, crs, options,
     cli::cli_abort("{.arg path} must be a single non-empty path.")
   }
   if (!is.null(options$PARTITION_BY)) {
-    if (length(partitioning)) {
-      cli::cli_abort("Set partitioning with either {.arg partitioning} or {.code options$PARTITION_BY}, not both.")
-    }
-    partitioning <- options$PARTITION_BY
+    partitioning <- ddbs_geoparquet_partition_names(options$PARTITION_BY)
     options$PARTITION_BY <- NULL
-    if (is.character(partitioning) && length(partitioning) == 1L &&
-        grepl("^\\(", partitioning)) {
-      cli::cli_abort("Use column names in {.arg partitioning}, not a raw SQL PARTITION_BY expression.")
-    }
   }
   if (!is.null(partitioning) && (!is.character(partitioning) || anyNA(partitioning) ||
                                any(!nzchar(partitioning)) || anyDuplicated(partitioning))) {
     cli::cli_abort("{.arg partitioning} must contain unique, non-missing column names.")
+  }
+  if (spatial_order && length(partitioning)) {
+    cli::cli_abort(c(
+      "DuckDB cannot guarantee spatial ordering for partitioned output.",
+      "i" = "Write without partitioning or set {.code parquet_spatial_order = FALSE}."
+    ))
+  }
+  if (spatial_order && !is.null(options$PRESERVE_ORDER)) {
+    preserve <- options$PRESERVE_ORDER
+    if (!is.atomic(preserve) || length(preserve) != 1L || is.na(preserve) ||
+        !tolower(trimws(as.character(preserve))) %in% c("true", "t", "yes", "1")) {
+      cli::cli_abort("{.arg parquet_spatial_order} requires {.code PRESERVE_ORDER = TRUE}; omit this COPY option or set it to TRUE.")
+    }
   }
   if (file.exists(path) && !overwrite) {
     cli::cli_abort("File {.path {path}} already exists. Use {.arg overwrite = TRUE} to replace.")
@@ -192,6 +230,14 @@ ddbs_write_geoparquet <- function(data, path, conn, overwrite, crs, options,
   quote_id <- function(x) as.character(DBI::dbQuoteIdentifier(conn, x))
   override <- if (!is.null(crs)) ddbs_geoparquet_crs(crs) else NULL
   if (inherits(data, "sf")) {
+    # DuckDB repairs case-insensitive name collisions when registering data.
+    # Resolving the original names afterwards could select the first column
+    # twice and silently replace the other column's values.
+    folded_names <- chartr("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz",
+                           names(data))
+    if (anyDuplicated(folded_names)) {
+      cli::cli_abort("Column names must be unique ignoring ASCII case for DuckDB GeoParquet export.")
+    }
     primary <- attr(data, "sf_column", exact = TRUE)
     geometry <- names(data)[vapply(data, inherits, logical(1), what = "sfc")]
     # [.sf can keep the active geometry implicitly; use an ordinary named list.
@@ -217,15 +263,20 @@ ddbs_write_geoparquet <- function(data, path, conn, overwrite, crs, options,
     # selecting, renaming, or joins that do not have a duckspatial method.
     source <- paste0("(", dbplyr::sql_render(data, con = conn), ")")
     types <- DBI::dbGetQuery(conn, paste0("DESCRIBE SELECT * FROM ", source))
-    geometry <- types$column_name[grepl("^GEOMETRY(\\(|$)", types$column_type)]
-    if (!length(geometry)) {
-      cli::cli_abort("Input DuckDB table/query does not contain a spatial column of type 'GEOMETRY'.")
-    }
-    # Match nested types, not enum labels or STRUCT attributes named GEOMETRY.
-    nested <- grepl("GEOMETRY(\\(|\\)|\\]|,|$)", types$column_type) &
-      !types$column_name %in% geometry
+    # Remove SQL string literals and quoted identifiers before matching type
+    # tokens. Enum labels, CRS text and STRUCT field names may themselves
+    # contain "GEOMETRY[]"; only actual geometry types are spatial columns.
+    type_tokens <- gsub("'(?:[^']|'')*'|\"(?:[^\"]|\"\")*\"", "",
+                        types$column_type, perl = TRUE)
+    is_geometry <- grepl("^GEOMETRY(\\(\\))?$", type_tokens)
+    nested <- grepl("\\bGEOMETRY(?:\\(\\)|(?=\\[|[[:space:]]*[,)]|$))",
+                    type_tokens, perl = TRUE) & !is_geometry
     if (any(nested)) {
       cli::cli_abort("GeoParquet geometry columns must be top-level, not nested in structs or lists.")
+    }
+    geometry <- types$column_name[is_geometry]
+    if (!length(geometry)) {
+      cli::cli_abort("Input DuckDB table/query does not contain a spatial column of type 'GEOMETRY'.")
     }
     primary <- attr(data, "sf_column", exact = TRUE)
     has_active <- !is.null(primary) && primary %in% geometry
@@ -256,8 +307,18 @@ ddbs_write_geoparquet <- function(data, path, conn, overwrite, crs, options,
     cli::cli_abort("Unsupported input type: {.cls {class(data)}}")
   }
 
-  if (length(setdiff(partitioning, fields))) {
-    cli::cli_abort("Unknown partition column(s): {.val {setdiff(partitioning, fields)}}.")
+  # DuckDB resolves both bare and quoted identifiers without ASCII case
+  # sensitivity. Match its behavior before checking duplicate/geometry keys.
+  partition_index <- match(
+    chartr("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz", partitioning),
+    chartr("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz", fields)
+  )
+  if (anyNA(partition_index)) {
+    cli::cli_abort("Unknown partition column(s): {.val {partitioning[is.na(partition_index)]}}.")
+  }
+  partitioning <- fields[partition_index]
+  if (anyDuplicated(partitioning)) {
+    cli::cli_abort("{.arg partitioning} must contain unique column names (ignoring ASCII case).")
   }
   if (length(intersect(partitioning, geometry))) {
     cli::cli_abort("Geometry columns cannot be used as partition keys.")
@@ -296,6 +357,10 @@ ddbs_write_geoparquet <- function(data, path, conn, overwrite, crs, options,
   if (!is.null(row_group_size)) copy$ROW_GROUP_SIZE <- row_group_size
   if (!is.null(compression_level)) copy$COMPRESSION_LEVEL <- compression_level
   copy <- utils::modifyList(copy, options)
+  # An ORDER BY query alone is insufficient if the connection or COPY options
+  # permit the Parquet writer to reorder rows. Also rejects incompatible
+  # multi-file writer modes through DuckDB's own COPY validation.
+  if (spatial_order) copy$PRESERVE_ORDER <- TRUE
   if (length(partitioning)) {
     copy$PARTITION_BY <- DBI::SQL(paste0("(", paste(quote_id(partitioning), collapse = ", "), ")"))
   }
