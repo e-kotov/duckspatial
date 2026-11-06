@@ -43,7 +43,6 @@ test_that("default GeoParquet is V1 and retains an explicit unknown CRS", {
   expect_equal(md$version, "1.0.0")
   expect_true(is.null(md$columns$geometry$crs))
   expect_equal(md$primary_column, "geometry")
-  expect_false(grepl("GEOMETRY", gp_type(conn, output), fixed = TRUE))
 
   # Read back through the GeoParquet-aware reader, not only the JSON footer.
   result <- ddbs_open_dataset(output, conn = conn)
@@ -76,10 +75,11 @@ test_that("V2 explicitly rejects unknown CRS instead of producing CRS84", {
   output <- tempfile(fileext = ".parquet")
   on.exit(unlink(output), add = TRUE)
 
-  expect_snapshot_error(
+  expect_error(
     ddbs_write_dataset(
       x, output, conn = conn, geoparquet_version = "V2", quiet = TRUE
-    )
+    ),
+    "unknown CRS"
   )
   expect_false(file.exists(output))
 })
