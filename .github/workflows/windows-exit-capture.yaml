@@ -14,6 +14,8 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 25
     steps:
+      # The diagnostic branch omits unused, unconfigured sync2 gitlinks so
+      # checkout can remove its temporary credentials before capture begins.
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
