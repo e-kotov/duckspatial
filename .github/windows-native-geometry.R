@@ -51,6 +51,8 @@ run_iteration <- function(iteration) {
     .windows_checkpoint("OWNED CONNECTION CLEANUP LEAVE: ", iteration)
   }, add = TRUE)
   DBI::dbExecute(conn, "INSTALL spatial; LOAD spatial;")
+  # DuckDB 2.0 requires an explicit XY/authority-axis-order choice for GDAL COPY.
+  DBI::dbExecute(conn, "SET geometry_always_xy = true")
   quote_path <- function(path) as.character(DBI::dbQuoteString(conn, normalizePath(path, winslash = "/", mustWork = FALSE)))
   DBI::dbExecute(conn, paste0("CREATE TABLE countries AS SELECT * FROM ST_Read(", quote_path(input), ")"))
   stopifnot(DBI::dbGetQuery(conn, "SELECT COUNT(*) AS n FROM countries")$n == 257)
