@@ -40,3 +40,9 @@ jobs:
           RS
       - name: Independently verify GeoParquet metadata and logical types
         run: python tools/validate_geoparquet.py
+      - name: Install independent GeoParquet specification validator
+        run: python -m pip install 'geoparquet-validator>=0.2.0'
+      - name: Validate V1 and V2 against GeoParquet core conformance rules
+        run: |
+          geoparquet-validator check gp-v1.parquet --class core
+          geoparquet-validator check gp-v2.parquet --class core
