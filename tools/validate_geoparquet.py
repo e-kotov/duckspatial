@@ -11,6 +11,6 @@ for filename, version in (("gp-v1.parquet", "1.0.0"),
     name = geo["primary_column"]
     assert name in geo["columns"]
     logical = str(parquet.schema.column(parquet.schema.names.index(name)).logical_type)
-    assert ("Geometry" in logical) == (version == "2.0.0"), logical
+    assert ("GEOMETRY" in logical.upper()) == (version == "2.0.0"), logical
     assert parquet.metadata.num_rows == 2
     print(filename, "validated")
