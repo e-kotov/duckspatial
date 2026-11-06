@@ -35,6 +35,7 @@ as_nanoarrow_array_stream.duckspatial_df <- function(x, ...,
 
   # 2. Execute and get Arrow data
   res <- DBI::dbSendQuery(conn, query_sql, arrow = TRUE)
+  on.exit(DBI::dbClearResult(res), add = TRUE)
   arrow_obj <- duckdb::duckdb_fetch_arrow(res, chunk_size = chunk_size)
   
   # 3. Native Path: Transform WKB to Native GeoArrow entirely in Arrow memory

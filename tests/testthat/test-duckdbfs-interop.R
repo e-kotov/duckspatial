@@ -6,15 +6,6 @@
 # =============================================================================
 testthat::skip_on_cran()
 
-## Create connection
-conn <- ddbs_default_conn()
-
-## Try to install h3 before duckdbfs
-h3_ext <- tryCatch(ddbs_install(conn, extension = "h3"), error = function(e) NULL)
-
-## Skip tests if h3 installation failed
-if (is.null(h3_ext)) testthat::skip()
-
 test_that("normalize_spatial_input works for duckdbfs::open_dataset inputs", {
   skip_if_not_installed("duckdbfs")
 
@@ -28,7 +19,7 @@ test_that("normalize_spatial_input works for duckdbfs::open_dataset inputs", {
   DBI::dbExecute(conn, glue::glue("COPY test_table TO '{tmp_file}' (FORMAT PARQUET)"))
 
   # Open with duckdbfs
-  ds <- duckdbfs::open_dataset(tmp_file)
+  ds <- duckdbfs::open_dataset(tmp_file, conn = conn)
 
   # Should be converted to duckspatial_df
   result <- normalize_spatial_input(ds)
@@ -53,9 +44,20 @@ test_that("ddbs_join works with raw duckdbfs tbl_duckdb_connection", {
   conn1 <- ddbs_temp_conn()
   conn2 <- ddbs_temp_conn()
 
+  # duckdbfs 0.1.2 looks up its extension catalog through cached_connection()
+  # even when open_dataset() receives a connection. Keep that lookup on the
+  # test-owned connection instead of creating a global cache with exit
+  # finalizers (and unrelated automatic H3 installation on some platforms).
+  active_conn <- conn1
+  testthat::local_mocked_bindings(
+    cached_connection = function(...) active_conn,
+    .package = "duckdbfs"
+  )
+
   countries1 <- duckdbfs::open_dataset(
     countries_path, format = "sf", conn = conn1
   )
+  active_conn <- conn2
   countries2 <- duckdbfs::open_dataset(
     countries_path, format = "sf", conn = conn2
   )

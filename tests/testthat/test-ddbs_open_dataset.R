@@ -384,6 +384,8 @@ test_that("ddbs_open_dataset validates DuckDB files properly", {
   )
 
   ds <- ddbs_open_dataset(tmp_good_duck, layer = "countries", crs = 4326)
+  # Close the connection owned by the returned lazy dataset before unlinking.
+  on.exit(ddbs_stop_conn(dbplyr::remote_con(ds)), add = TRUE, after = FALSE)
   expect_s3_class(ds, "duckspatial_df")
   expect_equal(as.character(dbplyr::remote_name(ds)), "countries")
   expect_equal(nrow(dplyr::collect(ds)), nrow(countries_sf))
@@ -403,6 +405,7 @@ test_that("ddbs_open_dataset opens supported DuckDB file extensions", {
   expect_duckdb_open <- function(db_path) {
     on.exit(unlink(db_path), add = TRUE)
     ds <- ddbs_open_dataset(db_path, layer = "countries", crs = 4326)
+    on.exit(ddbs_stop_conn(dbplyr::remote_con(ds)), add = TRUE, after = FALSE)
 
     expect_s3_class(ds, "duckspatial_df")
     expect_equal(as.character(dbplyr::remote_name(ds)), "countries")

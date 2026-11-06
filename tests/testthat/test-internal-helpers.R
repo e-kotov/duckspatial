@@ -10,6 +10,7 @@ test_that("ddbs_default_conn works as expected", {
   
   # 1. Should create new connection
   conn1 <- duckspatial:::ddbs_default_conn(create = TRUE)
+  on.exit(duckspatial::ddbs_stop_conn(conn1), add = TRUE)
   expect_true(DBI::dbIsValid(conn1))
   expect_true(inherits(conn1, "duckdb_connection"))
   

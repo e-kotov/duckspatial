@@ -1,0 +1,226 @@
+name: Windows GeoParquet diagnostics
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_native_install_reproducer:
+        description: Reproduce the upstream native Windows extension-disconnect failure
+        type: boolean
+        default: false
+
+jobs:
+  windows-test-diagnostics:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: release
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: local::., any::testthat, any::pkgload
+          needs: check
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Prepare process diagnostics
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force diagnostics | Out-Null
+          @'
+          options(warn = 1)
+          args <- commandArgs(trailingOnly = TRUE)
+          label <- args[[1L]]
+          test_filter <- if (length(args) >= 2L) args[[2L]] else if (label == "full-suite") NULL else label
+          log_dir <- normalizePath("diagnostics", winslash = "/")
+          checkpoint_file <- file.path(log_dir, paste0(label, "-checkpoints.log"))
+          .windows_checkpoint <- function(..., console = TRUE) {
+            line <- paste(format(Sys.time(), "%Y-%m-%d %H:%M:%OS3"),
+                          paste0(..., collapse = ""))
+            cat(line, "\n", file = checkpoint_file, append = TRUE)
+            if (console) {
+              cat(line, "\n", file = stderr())
+              flush(stderr())
+            }
+          }
+          .windows_checkpoint("PROCESS START: ", label, " PID=", Sys.getpid())
+          library(testthat)
+          library(duckdb)
+          print(sessionInfo())
+
+          # Trace the native-call boundary, so an R error can be distinguished
+          # from a native crash or a hang while executing SQL or disconnecting.
+          trace("rapi_prepare", where = asNamespace("duckdb"), print = FALSE,
+            tracer = quote(.GlobalEnv$.windows_checkpoint("SQL ENTER: ", query, console = FALSE)),
+            exit = quote(.GlobalEnv$.windows_checkpoint("SQL LEAVE", console = FALSE)))
+          for (native_call in c("rapi_execute", "rapi_disconnect", "rapi_shutdown")) {
+            trace(native_call, where = asNamespace("duckdb"), print = FALSE,
+              tracer = substitute(.GlobalEnv$.windows_checkpoint(LABEL, console = FALSE),
+                                  list(LABEL = paste(native_call, "ENTER"))),
+              exit = substitute(.GlobalEnv$.windows_checkpoint(LABEL, console = FALSE),
+                                list(LABEL = paste(native_call, "LEAVE"))))
+          }
+
+          test_error <- tryCatch({
+            selected_files <- testthat:::find_test_scripts("tests/testthat", filter = test_filter, full.names = FALSE)
+            if (!length(selected_files)) stop("Diagnostic filter selected no test files")
+            .windows_checkpoint("SELECTED TEST FILES: ", paste(basename(selected_files), collapse = ", "))
+            .windows_checkpoint("TESTS ENTER")
+            testthat::test_local(
+              filter = test_filter,
+              reporter = "location", stop_on_failure = TRUE)
+            .windows_checkpoint("TESTS RETURNED")
+            NULL
+          }, error = function(e) {
+            .windows_checkpoint("R ERROR: ", conditionMessage(e))
+            print(e)
+            dump.frames(file.path(log_dir, paste0(label, "-frames")), to.file = TRUE)
+            e
+          })
+
+          # Exercise the package's real unload hook, then the remaining native
+          # finalizers. A final shell marker confirms that R itself has exited.
+          .windows_checkpoint("PACKAGE UNLOAD ENTER")
+          if ("duckspatial" %in% loadedNamespaces()) pkgload::unload("duckspatial")
+          .windows_checkpoint("PACKAGE UNLOAD LEAVE")
+          .windows_checkpoint("GC ENTER")
+          gc()
+          .windows_checkpoint("GC LEAVE")
+          status <- if (is.null(test_error)) 0L else 1L
+          .windows_checkpoint("R EXIT REQUEST: status=", status)
+          quit(save = "no", status = status)
+          '@ | Set-Content -Path .github/windows-test-diagnostics.R
+      - name: Independent DuckDB install and disconnect reproduction
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_native_install_reproducer }}
+        timeout-minutes: 5
+        shell: pwsh
+        run: |
+          @'
+          # Do not load duckspatial or testthat. Compare the DBI/duckdb-only
+          # control with sf and a separate live spatial connection to identify
+          # which native-library/connection combination triggers the failure.
+          library(DBI)
+          library(duckdb)
+          mode <- commandArgs(trailingOnly = TRUE)[[1L]]
+          checkpoint <- function(...) {
+            cat(format(Sys.time(), "%H:%M:%OS3"), ..., "\n")
+            flush(stdout())
+          }
+          if (mode %in% c("sf-loaded", "sf-spatial-anchor", "nested-errors", "native-stack")) library(sf)
+          if (mode == "native-stack") {
+            for (pkg in c("arrow", "geoarrow", "nanoarrow", "wk", "dplyr", "dbplyr")) {
+              loadNamespace(pkg)
+            }
+          }
+          print(sessionInfo())
+          anchor <- NULL
+          if (mode %in% c("spatial-anchor", "sf-spatial-anchor", "nested-errors", "native-stack")) {
+            checkpoint("SPATIAL ANCHOR CONNECT")
+            anchor <- dbConnect(duckdb(shared_home = FALSE))
+            dbExecute(anchor, "INSTALL spatial; LOAD spatial;")
+          }
+          checkpoint("CONNECT", mode)
+          conn <- dbConnect(duckdb(shared_home = FALSE))
+          if (mode == "loaded-spatial") {
+            checkpoint("INSTALL AND LOAD SPATIAL")
+            dbExecute(conn, "INSTALL spatial; LOAD spatial;")
+          }
+          install_errors <- list()
+          if (mode %in% c("nested-errors", "native-stack")) {
+            fail_install <- function(conn) {
+              tryCatch(dbExecute(conn, "INSTALL nonexistent_extension_xyz;"),
+                error = function(core_error) {
+                  install_errors$core <<- core_error
+                  tryCatch(dbExecute(conn, "INSTALL nonexistent_extension_xyz FROM community;"),
+                    error = function(community_error) {
+                      install_errors$community <<- community_error
+                      NULL
+                    })
+                })
+              cli::cli_abort(c("Failed to install nonexistent_extension_xyz.",
+                "x" = conditionMessage(install_errors$core),
+                "x" = conditionMessage(install_errors$community)))
+            }
+            err <- tryCatch(fail_install(conn), error = identity)
+            stopifnot(inherits(err, "error"), length(install_errors) == 2L)
+            checkpoint("EXPECTED NESTED R ERROR", conditionMessage(err))
+          } else if (mode != "control") {
+            for (sql in c("INSTALL nonexistent_extension_xyz;",
+                          "INSTALL nonexistent_extension_xyz FROM community;")) {
+              checkpoint("SQL ENTER", sql)
+              err <- tryCatch({ dbExecute(conn, sql); NULL }, error = identity)
+              stopifnot(inherits(err, "error"))
+              install_errors[[length(install_errors) + 1L]] <- err
+              checkpoint("EXPECTED R ERROR", conditionMessage(err))
+            }
+          }
+          checkpoint("DISCONNECT ENTER")
+          dbDisconnect(conn)
+          checkpoint("DISCONNECT LEAVE")
+          if (!is.null(anchor)) {
+            checkpoint("SPATIAL ANCHOR DISCONNECT ENTER")
+            dbDisconnect(anchor)
+            checkpoint("SPATIAL ANCHOR DISCONNECT LEAVE")
+          }
+          gc()
+          checkpoint("R EXIT REQUEST")
+          '@ | Set-Content -Path .github/windows-native-install-repro.R
+          $failed = $false
+          foreach ($mode in @("control", "failed-install", "loaded-spatial", "sf-loaded", "spatial-anchor", "sf-spatial-anchor", "nested-errors", "native-stack")) {
+            Rscript .github/windows-native-install-repro.R $mode 2>&1 | Tee-Object -FilePath "diagnostics/native-$mode.log"
+            $code = $LASTEXITCODE
+            "PROCESS EXIT: $code" | Tee-Object -FilePath "diagnostics/native-$mode.log" -Append
+            if ($code -ne 0) { $failed = $true }
+          }
+          if ($failed) { exit 1 }
+      - name: New GeoParquet tests in isolation
+        if: ${{ !cancelled() }}
+        timeout-minutes: 10
+        shell: pwsh
+        run: |
+          Rscript .github/windows-test-diagnostics.R geoparquet 2>&1 | Tee-Object -FilePath diagnostics/geoparquet-console.log
+          $code = $LASTEXITCODE
+          "PROCESS EXIT: $code" | Tee-Object -FilePath diagnostics/geoparquet-console.log -Append
+          exit $code
+      - name: Extension tests with native SQL tracing
+        if: ${{ !cancelled() }}
+        timeout-minutes: 10
+        shell: pwsh
+        run: |
+          Rscript .github/windows-test-diagnostics.R db_extension 2>&1 | Tee-Object -FilePath diagnostics/extensions-console.log
+          $code = $LASTEXITCODE
+          "PROCESS EXIT: $code" | Tee-Object -FilePath diagnostics/extensions-console.log -Append
+          exit $code
+      - name: Full test suite with test and teardown progress
+        id: full-suite
+        if: ${{ !cancelled() }}
+        timeout-minutes: 16
+        shell: pwsh
+        run: |
+          python .github/windows-test-supervisor.py full-suite
+          exit $LASTEXITCODE
+      - name: Minimize a verified successful-test process-exit hang
+        if: ${{ !cancelled() && steps.full-suite.outcome == 'failure' }}
+        timeout-minutes: 22
+        shell: pwsh
+        run: |
+          python .github/windows-test-supervisor.py bisect --max-probes 16 --budget 1200
+          exit $LASTEXITCODE
+      - name: Collect Windows native crash events
+        if: always()
+        shell: pwsh
+        run: |
+          Get-WinEvent -FilterHashtable @{LogName = 'Application'; StartTime = (Get-Date).AddHours(-1)} -ErrorAction SilentlyContinue |
+            Where-Object { $_.Id -in 1000, 1001 } |
+            Format-List TimeCreated, Id, ProviderName, Message |
+            Out-File -FilePath diagnostics/windows-crash-events.log
+      - name: Upload Windows diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-test-diagnostics-${{ github.run_attempt }}
+          path: diagnostics
+          if-no-files-found: warn
