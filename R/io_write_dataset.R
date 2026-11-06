@@ -6,8 +6,8 @@
 #' formats, or can be specified explicitly via `gdal_driver`.
 #' 
 #' Persistent DuckDB database files created by duckspatial use **Native 
-#' Spatial Storage** (`storage_version = "v2.0.0"`) by default so CRS metadata is
-#' retained in native `GEOMETRY` columns. These files require DuckDB >= 2.0.0
+#' Spatial Storage** (`storage_version = "v1.5.0"`) by default so CRS metadata is
+#' retained in native `GEOMETRY` columns. These files require DuckDB >= 1.5.0
 #' to open; use **Legacy Compatibility** (`storage_version = "v1.0.0"`) 
 #' when the output must be readable by older DuckDB versions.
 #'
@@ -62,9 +62,9 @@
 #'   \url{https://duckdb.org/docs/internals/storage} for more information on
 #'   DuckDB storage versions and compatibility.
 #'   \itemize{
-#'     \item \code{"v2.0.0"} (\strong{Native Spatial Storage}, Default): Preserves
+#'     \item \code{"v1.5.0"} (\strong{Native Spatial Storage}, Default): Preserves
 #'           CRS metadata in native DuckDB \code{GEOMETRY} columns. Requires
-#'           DuckDB >= 2.0.0 to open the file.
+#'           DuckDB >= 1.5.0 to open the file.
 #'     \item \code{"v1.0.0"} (\strong{Legacy Compatibility}): Creates
 #'           files readable by older DuckDB versions (>= 1.0.0). Persists CRS
 #'           metadata in duckspatial-managed column comments (a convention not
