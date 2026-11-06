@@ -234,9 +234,17 @@ ddbs_write_geoparquet <- function(data, path, conn, overwrite, crs, options,
       if (identical(name, primary) && !is.null(override)) return(override)
       ddbs_geoparquet_native_crs(conn, types$column_type[match(name, types$column_name)])
     }), geometry)
-    # The native query type is authoritative, even when CRS was intentionally
-    # cleared. R-side CRS attributes can be stale after dplyr operations.
-    # Users may override explicitly with crs = ... above.
+    # Native query types are authoritative, even when a CRS is intentionally
+    # cleared. The R attribute can be stale after mutate(). Only a legacy
+    # DuckDB storage connection (which cannot represent CRS in GEOMETRY types)
+    # may use its duckspatial-managed CRS attribute as a fallback.
+    if (is.null(override) && has_active && is.na(crses[[primary]]) &&
+        inherits(data, "duckspatial_df") && ddbs_storage_is_legacy(conn)) {
+      stored <- attr(data, "crs", exact = TRUE)
+      if (!is.null(stored)) {
+        crses[[primary]] <- ddbs_geoparquet_crs(stored)
+      }
+    }
     fields <- types$column_name
     expressions <- stats::setNames(quote_id(fields), fields)
     for (name in geometry) {
