@@ -265,9 +265,9 @@ test_that("all-NULL geometry columns export in both versions with spatial orderi
     expect_equal(md$primary_column, "geometry")
     expect_equal(md$version, if (version == "V1") "1.0.0" else "2.0.0")
     p <- as.character(DBI::dbQuoteString(conn, output))
-    expect_equal(DBI::dbGetQuery(conn, paste0(
+    expect_equal(as.numeric(DBI::dbGetQuery(conn, paste0(
       "SELECT count(*) AS n FROM read_parquet(", p, ")"
-    ))$n[[1]], 3)
+    ))$n[[1]]), 3)
     unlink(output)
   }
 })
