@@ -1,0 +1,36 @@
+name: Windows validation case isolation
+
+on:
+  push:
+    branches: [debug/windows-exit-validation-20261106]
+  workflow_dispatch:
+
+jobs:
+  isolate:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: release
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: local::., any::testthat, any::pkgload
+          needs: check
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Run each validation case and repeat Arrow file group
+        timeout-minutes: 30
+        shell: pwsh
+        run: |
+          python .github/windows-validation-cases.py
+          exit $LASTEXITCODE
+      - name: Preserve every process result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-validation-cases-${{ github.run_attempt }}
+          path: diagnostics
+          if-no-files-found: error
