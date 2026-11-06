@@ -74,5 +74,44 @@ custom <- x
 sf::st_crs(custom) <- NA
 sf::st_crs(custom) <- "+proj=aeqd +lat_0=52 +lon_0=13 +datum=WGS84 +units=m +no_defs"
 write_fixture(custom, "custom-v2.parquet", "V2")
+
+# Non-point WKB preserves every vertex, interior ring and dimension. The Python
+# validator defines its expected geometries separately, including NULL/EMPTY.
+DBI::dbExecute(con, paste0(
+  "CREATE TEMP TABLE gp_nonpoint AS SELECT id, ",
+  "ST_GeomFromText(wkt)::GEOMETRY('EPSG:3857') AS geometry FROM (VALUES ",
+  "(1, 'LINESTRING (-8 4, 2 -3, 11 9)'), ",
+  "(2, 'LINESTRING Z (-4 2 7, 6 12 -5, 15 3 19)'), ",
+  "(3, 'POLYGON ((0 0, 8 0, 8 8, 0 8, 0 0), ",
+  "(2 2, 2 6, 6 6, 6 2, 2 2))'), ",
+  "(4, 'POLYGON Z ((20 20 1, 30 20 2, 30 30 9, 20 30 -2, 20 20 1))'), ",
+  "(5, 'MULTILINESTRING ((-10 20, -5 25, 0 20), (5 20, 10 15))'), ",
+  "(6, 'MULTIPOLYGON (((40 0, 44 0, 44 4, 40 4, 40 0)), ",
+  "((50 0, 54 0, 54 4, 50 4, 50 0)))'), ",
+  "(7, 'LINESTRING EMPTY'), (8, 'POLYGON EMPTY'), (9, NULL), ",
+  "(10, 'LINESTRING M (-20 -10 -12, -10 -5 70, 0 -10 5)'), ",
+  "(11, 'POLYGON ZM ((60 0 1 2, 64 0 4 9, 64 4 8 -3, ",
+  "60 4 5 6, 60 0 1 2))')",
+  ") t(id, wkt)"
+))
+nonpoint <- dplyr::tbl(con, "gp_nonpoint")
+
+# A permuted two-dimensional grid spans three physical row groups with the
+# requested size. Expected Hilbert order is calculated independently in Python.
+DBI::dbExecute(con, paste0(
+  "CREATE TEMP TABLE gp_ordered_groups AS SELECT id, ",
+  "ST_Point((id * 17) % 101, (id * 37) % 103)",
+  "::GEOMETRY('EPSG:3857') AS geometry FROM range(6000) t(id) ",
+  "ORDER BY (id * 7919) % 6000"
+))
+ordered_groups <- dplyr::tbl(con, "gp_ordered_groups")
+for (version in c("V1", "V2")) {
+  tag <- tolower(version)
+  selected <- if (version == "V1") dplyr::filter(nonpoint, id <= 9L) else nonpoint
+  write_fixture(selected, paste0("nonpoint-", tag, ".parquet"), version)
+  write_fixture(ordered_groups, paste0("ordered-row-groups-", tag, ".parquet"),
+                version, parquet_spatial_order = TRUE,
+                parquet_row_group_size = 2048L)
+}
 ddbs_stop_conn(con)
 cat("GeoParquet fixtures written to", out, "\n")

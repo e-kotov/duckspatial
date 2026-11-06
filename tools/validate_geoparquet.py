@@ -156,4 +156,65 @@ xy = shapely.get_coordinates(shapely.from_wkb(row["geometry"]))[0]
 want = Transformer.from_crs(4326, 3857, always_xy=True).transform(1, 2)
 assert all(math.isclose(a, b, rel_tol=1e-12) for a, b in zip(xy, want)), (xy, want)
 print(path.relative_to(ROOT), "validated")
+
+nonpoint_wkts = {
+    1: "LINESTRING (-8 4, 2 -3, 11 9)",
+    2: "LINESTRING Z (-4 2 7, 6 12 -5, 15 3 19)",
+    3: "POLYGON ((0 0, 8 0, 8 8, 0 8, 0 0), (2 2, 2 6, 6 6, 6 2, 2 2))",
+    4: "POLYGON Z ((20 20 1, 30 20 2, 30 30 9, 20 30 -2, 20 20 1))",
+    5: "MULTILINESTRING ((-10 20, -5 25, 0 20), (5 20, 10 15))",
+    6: "MULTIPOLYGON (((40 0, 44 0, 44 4, 40 4, 40 0)), "
+       "((50 0, 54 0, 54 4, 50 4, 50 0)))",
+    7: "LINESTRING EMPTY", 8: "POLYGON EMPTY", 9: None,
+    10: "LINESTRING M (-20 -10 -12, -10 -5 70, 0 -10 5)",
+    11: "POLYGON ZM ((60 0 1 2, 64 0 4 9, 64 4 8 -3, 60 4 5 6, 60 0 1 2))",
+}
+
+
+def hilbert_index(x, y):
+    """Standard quadrant-rotation Hilbert index on a 16-bit integer grid."""
+    side = 1 << 16
+    distance = 0
+    step = side >> 1
+    while step:
+        rx, ry = int(bool(x & step)), int(bool(y & step))
+        distance += step * step * ((3 * rx) ^ ry)
+        if ry == 0:
+            if rx == 1:
+                x, y = side - 1 - x, side - 1 - y
+            x, y = y, x
+        step >>= 1
+    return distance
+
+
+# Fixed corner values anchor orientation independently of the generated files.
+assert [hilbert_index(x, y) for x, y in
+        ((0, 0), (0, 65535), (65535, 65535), (65535, 0))] == [
+            0, 1431655765, 2863311530, 4294967295]
+grid = {i: ((i * 17) % 101, (i * 37) % 103) for i in range(6000)}
+# ST_Hilbert maps the known extent [0, 100] x [0, 102] to 16-bit coordinates
+# with truncation, then computes the Hilbert distance. Preserve operation order:
+# https://github.com/duckdb/duckdb-spatial/blob/a3dbcd1781ec26c3a1be9bd622be05b376d6f47a/src/spatial/modules/main/spatial_functions_scalar.cpp
+indices = {i: hilbert_index(int(x * (65535 / 100)), int(y * (65535 / 102)))
+           for i, (x, y) in grid.items()}
+assert len(set(indices.values())) == len(grid)
+expected_order = sorted(grid, key=indices.__getitem__)
+grid_expected = {i: {"geometry": f"POINT ({x} {y})"} for i, (x, y) in grid.items()}
+for tag, version in (("v1", "1.0.0"), ("v2", "2.0.0")):
+    expected = {i: {"geometry": wkt} for i, wkt in nonpoint_wkts.items()
+                if tag == "v2" or i <= 9}
+    check_file(ROOT / f"nonpoint-{tag}.parquet", version, "geometry",
+               {"geometry": 3857}, expected)
+    path = ROOT / f"ordered-row-groups-{tag}.parquet"
+    check_file(path, version, "geometry", {"geometry": 3857}, grid_expected)
+    parquet = pq.ParquetFile(path)
+    group_sizes = [parquet.metadata.row_group(i).num_rows
+                   for i in range(parquet.num_row_groups)]
+    assert len(group_sizes) >= 3 and all(size > 0 for size in group_sizes), (path, group_sizes)
+    # PyArrow reads physical row groups in file order. Comparing the complete
+    # sequence verifies the boundaries as well as ordering within each group.
+    physical_ids = parquet.read(columns=["id"]).column(0).to_pylist()
+    assert physical_ids == expected_order, path
+    print(path.relative_to(ROOT), "Hilbert order validated across row groups", group_sizes)
+
 print("All independent GeoParquet interoperability checks passed")
