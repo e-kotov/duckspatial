@@ -84,7 +84,9 @@
 #' @details
 #' Parquet exports preserve each geometry column's CRS. For lazy input, the
 #' native DuckDB query type is authoritative, including unknown CRS: an R
-#' attribute may be stale after dplyr transformations. `crs` overrides the
+#' attribute may be stale after dplyr transformations. The legacy DuckDB
+#' storage mode uses the R attribute when native geometry types lack CRS.
+#' `crs` overrides the
 #' active geometry without changing any other geometry column or the input.
 #'
 #' V2 delegates native geometry serialization and row-group statistics to
