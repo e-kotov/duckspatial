@@ -13,7 +13,7 @@ on:
 jobs:
   windows-test-diagnostics:
     runs-on: windows-latest
-    timeout-minutes: 40
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v6
       - uses: r-lib/actions/setup-r@v2
@@ -23,6 +23,9 @@ jobs:
         with:
           extra-packages: local::., any::testthat, any::pkgload
           needs: check
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
       - name: Prepare process diagnostics
         shell: pwsh
         run: |
@@ -31,6 +34,7 @@ jobs:
           options(warn = 1)
           args <- commandArgs(trailingOnly = TRUE)
           label <- args[[1L]]
+          test_filter <- if (length(args) >= 2L) args[[2L]] else if (label == "full-suite") NULL else label
           log_dir <- normalizePath("diagnostics", winslash = "/")
           checkpoint_file <- file.path(log_dir, paste0(label, "-checkpoints.log"))
           .windows_checkpoint <- function(..., console = TRUE) {
@@ -61,9 +65,12 @@ jobs:
           }
 
           test_error <- tryCatch({
+            selected_files <- testthat:::find_test_scripts("tests/testthat", filter = test_filter, full.names = FALSE)
+            if (!length(selected_files)) stop("Diagnostic filter selected no test files")
+            .windows_checkpoint("SELECTED TEST FILES: ", paste(basename(selected_files), collapse = ", "))
             .windows_checkpoint("TESTS ENTER")
             testthat::test_local(
-              filter = if (label == "full-suite") NULL else label,
+              filter = test_filter,
               reporter = "location", stop_on_failure = TRUE)
             .windows_checkpoint("TESTS RETURNED")
             NULL
@@ -188,14 +195,20 @@ jobs:
           "PROCESS EXIT: $code" | Tee-Object -FilePath diagnostics/extensions-console.log -Append
           exit $code
       - name: Full test suite with test and teardown progress
+        id: full-suite
         if: ${{ !cancelled() }}
-        timeout-minutes: 15
+        timeout-minutes: 16
         shell: pwsh
         run: |
-          Rscript .github/windows-test-diagnostics.R full-suite 2>&1 | Tee-Object -FilePath diagnostics/full-suite-console.log
-          $code = $LASTEXITCODE
-          "PROCESS EXIT: $code" | Tee-Object -FilePath diagnostics/full-suite-console.log -Append
-          exit $code
+          python .github/windows-test-supervisor.py full-suite
+          exit $LASTEXITCODE
+      - name: Minimize a verified successful-test process-exit hang
+        if: ${{ !cancelled() && steps.full-suite.outcome == 'failure' }}
+        timeout-minutes: 22
+        shell: pwsh
+        run: |
+          python .github/windows-test-supervisor.py bisect --max-probes 16 --budget 1200
+          exit $LASTEXITCODE
       - name: Collect Windows native crash events
         if: always()
         shell: pwsh
