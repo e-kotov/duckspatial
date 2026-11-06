@@ -1,0 +1,36 @@
+name: Independent Windows DuckDB geometry teardown
+
+on:
+  push:
+    branches: [debug/windows-exit-validation-20261106]
+  workflow_dispatch:
+
+jobs:
+  raw-dbi:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: release
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          packages: any::DBI, any::duckdb, any::sf
+          dependencies: 'c("Depends", "Imports", "LinkingTo")'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Repeat native geometry IO and observe actual process exit
+        timeout-minutes: 27
+        shell: pwsh
+        run: |
+          python .github/windows-native-geometry.py
+          exit $LASTEXITCODE
+      - name: Preserve standalone native results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-native-geometry-${{ github.run_attempt }}
+          path: diagnostics
+          if-no-files-found: error
