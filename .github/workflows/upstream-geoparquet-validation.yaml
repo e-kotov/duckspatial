@@ -3,6 +3,7 @@ name: Upstream GeoParquet validation
 on:
   push:
     branches: [debug/geoparquet-upstream-validation-20261107]
+    paths: ['.github/upstream-validation/windows-*.R', '.github/upstream-validation/windows-*.py']
 
 permissions:
   contents: read

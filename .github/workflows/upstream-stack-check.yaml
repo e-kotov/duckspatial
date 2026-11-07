@@ -1,0 +1,152 @@
+name: Clean GeoParquet stack checks
+
+on:
+  push:
+    branches: [debug/geoparquet-upstream-validation-20261107]
+    paths: ['.github/workflows/upstream-stack-check.yaml', '.github/upstream-validation/interop/**']
+
+permissions:
+  contents: read
+
+env:
+  SOURCE_SHA: c9ad8393c2eaf0d96eee7cedee3af379efff01b3
+
+jobs:
+  full-package:
+    name: V1.1 ${{ matrix.config.os }} (${{ matrix.config.r }})
+    runs-on: ${{ matrix.config.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - {os: windows-latest, r: release}
+          - {os: macos-latest, r: release}
+          - {os: ubuntu-24.04, r: release, rspm: 'https://packagemanager.rstudio.com/cran/__linux__/noble/latest'}
+          - {os: ubuntu-24.04, r: devel, rspm: 'https://packagemanager.rstudio.com/cran/__linux__/noble/latest'}
+          - {os: ubuntu-24.04, r: oldrel, rspm: 'https://packagemanager.rstudio.com/cran/__linux__/noble/latest'}
+    env:
+      RSPM: ${{ matrix.config.rspm }}
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      _R_CHECK_TESTS_NLINES_: 0
+      NOT_CRAN: 'true'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: harness
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          path: package
+      - name: Verify exact unchanged contribution source
+        shell: bash
+        run: |
+          test "$(git -C package rev-parse HEAD)" = "$SOURCE_SHA"
+          git -C package diff --exit-code
+          echo "TESTED_SOURCE_SHA=$SOURCE_SHA"
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: ${{ matrix.config.r }}
+      - uses: r-lib/actions/setup-pandoc@v2
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          working-directory: package
+          extra-packages: any::rcmdcheck, local::.
+          needs: check
+      - uses: actions/setup-python@v6
+        if: runner.os == 'Windows'
+        with:
+          python-version: '3.12'
+      - name: Windows GeoParquet tests with actual process exit gate
+        if: runner.os == 'Windows'
+        timeout-minutes: 8
+        working-directory: package
+        env:
+          DIAGNOSTICS_DIR: ${{ runner.temp }}/stack-windows-geoparquet
+        shell: pwsh
+        run: |
+          python ../harness/.github/upstream-validation/windows-test-supervisor.py --runner ../harness/.github/upstream-validation/windows-test-diagnostics.R --label v11-geoparquet --expected-sha $env:SOURCE_SHA --filter '^geoparquet' --limit 360
+          exit $LASTEXITCODE
+      - name: Full standard package check
+        if: ${{ !cancelled() }}
+        uses: r-lib/actions/check-r-package@v2
+        with:
+          working-directory: package
+          upload-results: 'true'
+          artifact-name: stack-check-${{ matrix.config.os }}-${{ matrix.config.r }}
+      - name: Preserve Windows targeted-test evidence
+        if: ${{ always() && runner.os == 'Windows' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: stack-windows-geoparquet-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/stack-windows-geoparquet
+          if-no-files-found: warn
+
+  interoperability:
+    name: V1 V1.1 V2 independent conformance
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      NOT_CRAN: 'true'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: harness
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          path: package
+      - name: Verify exact source
+        shell: bash
+        run: |
+          test "$(git -C package rev-parse HEAD)" = "$SOURCE_SHA"
+          git -C package diff --exit-code
+          echo "TESTED_SOURCE_SHA=$SOURCE_SHA"
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: release
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          working-directory: package
+          extra-packages: local::.
+          needs: check
+      - name: Run all GeoParquet regression tests
+        working-directory: package
+        shell: Rscript {0}
+        run: |
+          results <- testthat::test_local(filter = "^geoparquet", stop_on_failure = TRUE)
+          dir.create("geoparquet-interop", showWarnings = FALSE)
+          d <- as.data.frame(results)
+          d <- d[, !vapply(d, is.list, logical(1)), drop = FALSE]
+          write.csv(d, "geoparquet-interop/targeted-test-results.csv", row.names = FALSE)
+          writeLines(Sys.getenv("SOURCE_SHA"), "geoparquet-interop/tested-source-sha.txt")
+          capture.output(sessionInfo(), file = "geoparquet-interop/R-session-info.txt")
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install independent readers and conformance validator
+        run: python -m pip install 'pyarrow>=26' 'shapely>=2.1' pyproj 'geoparquet-validator>=0.3.1' 'geopandas>=1.2' 'pyogrio>=0.11'
+      - name: Generate fresh physical files from the stack
+        working-directory: package
+        run: Rscript ../harness/.github/upstream-validation/interop/generate_geoparquet_fixtures.R
+      - name: Inspect physical encoding, geometries, CRS and physical Hilbert order
+        working-directory: package
+        run: python ../harness/.github/upstream-validation/interop/validate_geoparquet.py
+      - name: GeoPandas round trips and available GDAL reads
+        working-directory: package
+        run: python ../harness/.github/upstream-validation/interop/validate_geoparquet_readers.py
+      - name: Validate every generated file against GeoParquet core rules
+        working-directory: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          python ../harness/.github/upstream-validation/interop/run_core_conformance.py
+          python -m pip freeze > geoparquet-interop/python-versions.txt
+      - name: Preserve independent interoperability evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clean-stack-geoparquet-interop
+          path: package/geoparquet-interop
+          if-no-files-found: warn
