@@ -62,7 +62,7 @@ runs on a temporary DuckDB database.}
 
 \item{crs}{Output CRS assignment (e.g., "EPSG:4326"). Passed to GDAL as \code{SRS}.
 For Parquet, overrides the active geometry column's CRS; \code{NA} explicitly
-means unknown in V1 output. V2 currently rejects unknown CRS because
+means unknown in V1 or V1.1 output. V2 currently rejects unknown CRS because
 DuckDB cannot encode native \code{srid:0}. This assigns metadata, not a
 coordinate transformation.
 Use \code{\link[=ddbs_transform]{ddbs_transform()}} or \code{\link[sf:st_transform]{sf::st_transform()}} to reproject first.}
@@ -72,7 +72,7 @@ Use \code{\link[=ddbs_transform]{ddbs_transform()}} or \code{\link[sf:st_transfo
 \item{options}{Named list of additional options passed to \code{COPY}. For Parquet,
 names are case-insensitive. An existing \code{GEOPARQUET_VERSION} option is
 honoured unless it conflicts with an explicitly supplied
-\code{geoparquet_version}. For V1 and V2, \code{KV_METADATA} must be a named list of strings;
+\code{geoparquet_version}. For V1, V1.1 and V2, \code{KV_METADATA} must be a named list of strings;
 its \code{geo} key is reserved. Other options override the convenience arguments.
 Supply \code{PARTITION_BY} as column names, a parenthesized SQL identifier list,
 or use \code{partitioning}. Spatial ordering requires \code{PRESERVE_ORDER = TRUE};
@@ -106,9 +106,10 @@ installed DuckDB engine.
 }
 Other major version strings like \code{"v1.4.0"}, \code{"v1.3.0"}, etc., are also supported.}
 
-\item{geoparquet_version}{GeoParquet output version: \code{"V1"} (default, 1.0.0,
-for compatibility with older readers) or \code{"V2"} (2.0.0, native Parquet
-geometry logical types and geospatial statistics). Parquet output only.
+\item{geoparquet_version}{GeoParquet output version: \code{"V1"} (default,
+1.0.0, for compatibility with older readers), \code{"V1.1"} (1.1.0, WKB),
+or \code{"V2"} (2.0.0, native Parquet geometry logical types and row-group
+geospatial statistics). Parquet output only.
 This is independent of \code{PARQUET_VERSION} and \code{duckdb_storage_version}.}
 
 \item{parquet_spatial_order}{Logical. If \code{TRUE}, order Parquet rows by a
@@ -148,14 +149,15 @@ DuckDB, and supplies one explicit \code{geo} metadata block at write time. This
 preserves the active geometry, writes full PROJJSON definitions, and pairs
 known CRS in the native type and inline PROJJSON in the metadata. DuckDB 2.0
 cannot construct native \code{srid:0}: V2 therefore rejects unknown CRS rather
-than silently labelling its coordinates CRS84. V1 writes explicit \code{crs: null}
-when unknown. Geometry types are declared unknown (\verb{geometry_types: []}),
-as permitted by the specification; actual
-types and bounds remain in native row-group statistics. No whole-dataset
+than silently labelling its coordinates CRS84. V1 and V1.1 write WKB geometry columns with explicit \code{crs: null} for
+unknown CRS. V1.1 intentionally omits optional native coordinate encodings
+and bbox covering columns. All versions declare \verb{geometry_types: []}
+(unknown types), as permitted by the specifications. Only V2 has native
+row-group geospatial type and bounds statistics. No whole-dataset
 bounding box is incorrectly reused in partition files. No post-write file
 rewriting or R-side geometry serialization is performed for lazy inputs.
-V1 supports XY and XYZ geometries. Measured geometries (XYM or XYZM)
-require V2; V1 rejects them without dropping their measures. All geometry
+V1 and V1.1 support XY and XYZ geometries. Measured geometries (XYM or
+XYZM) require V2; V1 and V1.1 reject them without dropping measures. All geometry
 columns must be top-level. Column names must be unique ignoring ASCII case,
 as required by DuckDB's identifier rules.
 
@@ -207,6 +209,7 @@ This function is inspired by and builds upon the logic found in the
 particularly its \code{write_dataset} and \code{write_geo} functions.
 For advanced features like cloud storage (S3) support, the
 \code{duckdbfs} package is highly recommended.
+\url{https://geoparquet.org/releases/v1.1.0/}
 \url{https://geoparquet.org/releases/v2.0.0/}
 }
 \seealso{
