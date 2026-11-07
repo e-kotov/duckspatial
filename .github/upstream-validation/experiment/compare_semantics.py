@@ -105,7 +105,9 @@ def evaluate(case, lane, target):
             if ra.keys()!=rb.keys():
                 issues.append("attribute_column_set");break
             for col in ra:
-                if col in common:
+                if col in (set(acol) | set(bcol)) and (
+                    isinstance(ra[col], bytes) or isinstance(rb[col], bytes)
+                ):
                     if not geom_equal(ra[col],rb[col]):
                         issues.append("geometry_coordinates_"+col)
                 elif ra[col]!=rb[col]:
@@ -115,9 +117,28 @@ def evaluate(case, lane, target):
         if acl and bcl:
             if acl["physical"]!=bcl["physical"]:issues.append("physical_type_"+col)
             if acl["logical"]!=bcl["logical"]:issues.append("native_annotation_"+col)
+    def summarize_geo(g):
+        def crs_label(entry):
+            if "crs" not in entry:return "MISSING (implies CRS84)"
+            if entry["crs"] is None:return "null (unknown)"
+            try:
+                obj=CRS.from_json_dict(entry["crs"])
+                authority=obj.to_authority()
+                return ":".join(authority) if authority else obj.name
+            except Exception as e:
+                return "invalid PROJJSON: "+str(e)[:80]
+        return {"version":g.get("version", "<missing>"),
+                "primary_column":g.get("primary_column", "<missing>"),
+                "columns":{name:{"encoding":v.get("encoding"),
+                                  "crs":crs_label(v)}
+                           for name,v in g.get("columns",{}).items()}}
     return {"equal":not issues,"issues":sorted(set(issues)),
             "enhanced_files":len(a),"other_files":len(b),
-            "enhanced_version":amag.get("version"),"other_version":bmag.get("version")}
+            "enhanced_version":amag.get("version"),"other_version":bmag.get("version"),
+            "enhanced_geo":summarize_geo(amag),
+            "other_geo":summarize_geo(bmag),
+            "enhanced_schema":a[0]["cols"],
+            "other_schema":b[0]["cols"]}
 all_cases=sorted({r["case"] for r in rows})
 for case in all_cases:
     for lane in ("legacy","direct"):
@@ -161,6 +182,9 @@ with (root/"comparison.md").open("w") as f:
                 f"{', '.join(r['issues']) or 'unknown'}")
         if r["control_error"]:f.write(f"; error: {r['control_error'][:320]}")
         f.write("\n")
+        if r.get("enhanced_geo") and r.get("other_geo"):
+            f.write("  - enhanced: "+json.dumps(r["enhanced_geo"],ensure_ascii=False)+"\n")
+            f.write("  - delegated: "+json.dumps(r["other_geo"],ensure_ascii=False)+"\n")
     f.write("\n## Interpretation limits\n\n"
             "- A failed baseline write does not imply core DuckDB cannot produce "
             "that encoding; it may reflect original duckspatial preprocessing.\n"
