@@ -1,0 +1,104 @@
+name: Upstream GeoParquet validation
+
+on:
+  push:
+    branches: [debug/geoparquet-upstream-validation-20261107]
+
+permissions:
+  contents: read
+
+jobs:
+  windows-diagnosis:
+    name: Windows ${{ matrix.source.label }}
+    runs-on: windows-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        source:
+          - {label: pr7-extensions, sha: 518647c2c685304c26335386876e504339a7a681, filter: db_extension}
+          - {label: pr7-full, sha: 518647c2c685304c26335386876e504339a7a681, filter: ''}
+          - {label: pr7-geoparquet, sha: 518647c2c685304c26335386876e504339a7a681, filter: geoparquet}
+          - {label: pr5-full, sha: bc6c22c9a3e41a7d2959d8678ea15f1388e06202, filter: ''}
+          - {label: main-extensions, sha: 677ed965894f20b5f83bdc6a389f42ccddb6a7ba, filter: db_extension}
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      NOT_CRAN: 'true'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: harness
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ matrix.source.sha }}
+          path: package
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: release
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          working-directory: package
+          extra-packages: local::., any::testthat, any::pkgload
+          needs: check
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Run unchanged tests and require successful process exit
+        working-directory: package
+        shell: pwsh
+        run: |
+          $args = @('../harness/.github/upstream-validation/windows-test-supervisor.py', '--runner', '../harness/.github/upstream-validation/windows-test-diagnostics.R', '--label', '${{ matrix.source.label }}', '--expected-sha', '${{ matrix.source.sha }}')
+          if ('${{ matrix.source.filter }}' -ne '') { $args += @('--filter', '${{ matrix.source.filter }}') }
+          python @args
+          exit $LASTEXITCODE
+      - name: Preserve Windows evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnosis-${{ matrix.source.label }}-${{ github.run_attempt }}
+          path: package/diagnostics
+          if-no-files-found: warn
+
+  native-install:
+    name: Windows independent native install controls
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      NOT_CRAN: 'true'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: harness
+      - uses: actions/checkout@v6
+        with:
+          ref: 518647c2c685304c26335386876e504339a7a681
+          path: package
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: release
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          working-directory: package
+          extra-packages: local::.
+          needs: check
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Run DBI and DuckDB only controls
+        working-directory: package
+        shell: pwsh
+        run: |
+          $failed = $false
+          foreach ($case in @('anchor-control', 'failed-install-control', 'failed-install-anchor', 'aws-control', 'aws-anchor')) {
+            python ../harness/.github/upstream-validation/windows-test-supervisor.py --runner ../harness/.github/upstream-validation/windows-native-install-repro.R --label "native-$case" --expected-sha 518647c2c685304c26335386876e504339a7a681 --case $case
+            if ($LASTEXITCODE -ne 0) { $failed = $true }
+          }
+          if ($failed) { exit 1 }
+      - name: Preserve independent native evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnosis-native-install-${{ github.run_attempt }}
+          path: package/diagnostics
+          if-no-files-found: warn
