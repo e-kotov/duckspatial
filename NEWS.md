@@ -5,6 +5,8 @@
 
 ## NEW FEATURES
 
+* `ddbs_write_dataset()`: adds opt-in GeoParquet 2.0 output with `geoparquet_version = "V2"`, preserving each geometry column's CRS and the active geometry. GeoParquet 1.0 remains the default and records unknown CRS explicitly. Optional single-file Hilbert spatial ordering and ZSTD compression levels are supported. V2 currently requires a known CRS; measured (M/ZM) geometries require V2.
+
 * `duckspatial` defaults storage is now v2.0.0 (see <https://duckdb.org/docs/2.0/internals/storage>).
 
 ## BUG FIXES

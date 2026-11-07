@@ -19,7 +19,10 @@ ddbs_write_dataset(
   parquet_row_group_size = NULL,
   layer_creation_options = NULL,
   quiet = FALSE,
-  duckdb_storage_version = duckspatial_storage_default()
+  duckdb_storage_version = duckspatial_storage_default(),
+  geoparquet_version = "V1",
+  parquet_spatial_order = FALSE,
+  parquet_compression_level = NULL
 )
 }
 \arguments{
@@ -57,11 +60,23 @@ runs on a temporary DuckDB database.}
 
 \item{overwrite}{Logical. If \code{TRUE}, overwrites existing file.}
 
-\item{crs}{Output CRS (e.g., "EPSG:4326"). Passed to GDAL as \code{SRS} option. Ignored for Parquet.}
+\item{crs}{Output CRS assignment (e.g., "EPSG:4326"). Passed to GDAL as \code{SRS}.
+For Parquet, overrides the active geometry column's CRS; \code{NA} explicitly
+means unknown in V1 output. V2 currently rejects unknown CRS because
+DuckDB cannot encode native \code{srid:0}. This assigns metadata, not a
+coordinate transformation.
+Use \code{\link[=ddbs_transform]{ddbs_transform()}} or \code{\link[sf:st_transform]{sf::st_transform()}} to reproject first.}
 
 \item{layer}{Table name for native DuckDB database output.}
 
-\item{options}{Named list of additional options passed to \code{COPY}.}
+\item{options}{Named list of additional options passed to \code{COPY}. For Parquet,
+names are case-insensitive. An existing \code{GEOPARQUET_VERSION} option is
+honoured unless it conflicts with an explicitly supplied
+\code{geoparquet_version}. For V1 and V2, \code{KV_METADATA} must be a named list of strings;
+its \code{geo} key is reserved. Other options override the convenience arguments.
+Supply \code{PARTITION_BY} as column names, a parenthesized SQL identifier list,
+or use \code{partitioning}. Spatial ordering requires \code{PRESERVE_ORDER = TRUE};
+a conflicting option is rejected.}
 
 \item{partitioning}{Character vector of columns to partition by (Parquet/CSV only).}
 
@@ -90,6 +105,20 @@ recognized by other spatial software).
 installed DuckDB engine.
 }
 Other major version strings like \code{"v1.4.0"}, \code{"v1.3.0"}, etc., are also supported.}
+
+\item{geoparquet_version}{GeoParquet output version: \code{"V1"} (default, 1.0.0,
+for compatibility with older readers) or \code{"V2"} (2.0.0, native Parquet
+geometry logical types and geospatial statistics). Parquet output only.
+This is independent of \code{PARQUET_VERSION} and \code{duckdb_storage_version}.}
+
+\item{parquet_spatial_order}{Logical. If \code{TRUE}, order Parquet rows by a
+Hilbert index of the active geometry within the dataset extent. Null and
+empty geometries sort last. This adds an extent scan and an external sort
+in DuckDB; it does not collect the dataset into R. Requires a single output
+file (no partitioning). Default is \code{FALSE}.}
+
+\item{parquet_compression_level}{Optional integer ZSTD compression level.
+Requires \code{parquet_compression = "zstd"} (or the equivalent COPY option).}
 }
 \value{
 The \code{path} invisibly.
@@ -106,6 +135,36 @@ Spatial Storage} (\code{storage_version = "v1.5.0"}) by default so CRS metadata 
 retained in native \code{GEOMETRY} columns. These files require DuckDB >= 1.5.0
 to open; use \strong{Legacy Compatibility} (\code{storage_version = "v1.0.0"})
 when the output must be readable by older DuckDB versions.
+
+Parquet exports preserve each geometry column's CRS. For lazy input, the
+native DuckDB query type is authoritative, including unknown CRS: an R
+attribute may be stale after dplyr transformations. The legacy DuckDB
+storage mode uses the R attribute when native geometry types lack CRS.
+\code{crs} overrides the
+active geometry without changing any other geometry column or the input.
+
+V2 delegates native geometry serialization and row-group statistics to
+DuckDB, and supplies one explicit \code{geo} metadata block at write time. This
+preserves the active geometry, writes full PROJJSON definitions, and pairs
+known CRS in the native type and inline PROJJSON in the metadata. DuckDB 2.0
+cannot construct native \code{srid:0}: V2 therefore rejects unknown CRS rather
+than silently labelling its coordinates CRS84. V1 writes explicit \code{crs: null}
+when unknown. Geometry types are declared unknown (\verb{geometry_types: []}),
+as permitted by the specification; actual
+types and bounds remain in native row-group statistics. No whole-dataset
+bounding box is incorrectly reused in partition files. No post-write file
+rewriting or R-side geometry serialization is performed for lazy inputs.
+V1 supports XY and XYZ geometries. Measured geometries (XYM or XYZM)
+require V2; V1 rejects them without dropping their measures. All geometry
+columns must be top-level. Column names must be unique ignoring ASCII case,
+as required by DuckDB's identifier rules.
+
+Spatial ordering, ZSTD compression, and a row-group size around 100000 are
+optional distribution optimizations, not requirements of GeoParquet 2.0.
+Defaults are not changed automatically when selecting V2.
+Spatial ordering currently requires a single output file. DuckDB does not
+preserve the requested order in partitioned output, so combining
+\code{parquet_spatial_order = TRUE} with \code{partitioning} or \code{PARTITION_BY} is rejected.
 }
 \examples{
 \dontrun{
@@ -119,6 +178,13 @@ ds <- ddbs_open_dataset(path)
 ddbs_write_dataset(ds, "output.geojson")
 ddbs_write_dataset(ds, "output.gpkg")
 ddbs_write_dataset(ds, "output.parquet")
+
+# GeoParquet 2.0 with optional distribution optimizations
+ddbs_write_dataset(
+  ds, "output_v2.parquet", geoparquet_version = "V2",
+  parquet_spatial_order = TRUE, parquet_compression = "zstd",
+  parquet_compression_level = 15, parquet_row_group_size = 100000
+)
 
 # Explicit GDAL driver for non-standard extension
 ddbs_write_dataset(ds, "mydata.dat", gdal_driver = "GeoJSON")
@@ -141,6 +207,7 @@ This function is inspired by and builds upon the logic found in the
 particularly its \code{write_dataset} and \code{write_geo} functions.
 For advanced features like cloud storage (S3) support, the
 \code{duckdbfs} package is highly recommended.
+\url{https://geoparquet.org/releases/v2.0.0/}
 }
 \seealso{
 \code{\link[=ddbs_drivers]{ddbs_drivers()}} to list all available GDAL drivers and formats.
