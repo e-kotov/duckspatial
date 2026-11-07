@@ -37,21 +37,17 @@
 #'   require a GDAL driver.
 #' @template conn_null
 #' @param overwrite Logical. If `TRUE`, overwrites existing file.
-#' @param crs Output CRS assignment (e.g., "EPSG:4326"). Passed to GDAL as `SRS`.
-#'   For Parquet, overrides the active geometry column's CRS; `NA` explicitly
-#'   means unknown in V1 output. V2 currently rejects unknown CRS because
-#'   DuckDB cannot encode native `srid:0`. This assigns metadata, not a
-#'   coordinate transformation.
-#'   Use [ddbs_transform()] or [sf::st_transform()] to reproject first.
+#' @param crs Output CRS assignment (e.g., `"EPSG:4326"`), or `NULL` to keep the
+#'   input CRS. Passed to GDAL as `SRS`; for Parquet, affects only the active
+#'   geometry. `NA` means unknown in V1; V2 requires a known CRS. Coordinates
+#'   are unchanged; use [ddbs_transform()] or [sf::st_transform()] to reproject.
 #' @param layer Table name for native DuckDB database output.
-#' @param options Named list of additional options passed to `COPY`. For Parquet,
-#'   names are case-insensitive. An existing `GEOPARQUET_VERSION` option is
-#'   honoured unless it conflicts with an explicitly supplied
-#'   `geoparquet_version`. For V1 and V2, `KV_METADATA` must be a named list of strings;
-#'   its `geo` key is reserved. Other options override the convenience arguments.
-#'   Supply `PARTITION_BY` as column names, a parenthesized SQL identifier list,
-#'   or use `partitioning`. Spatial ordering requires `PRESERVE_ORDER = TRUE`;
-#'   a conflicting option is rejected.
+#' @param options Named list of additional `COPY` options. For Parquet, names
+#'   are case-insensitive and options override the convenience arguments.
+#'   `GEOPARQUET_VERSION` may select the version, but must agree with an explicit
+#'   `geoparquet_version`. For V1/V2, `KV_METADATA` is a named list of strings
+#'   with `geo` reserved. `PARTITION_BY` accepts column names or a parenthesized
+#'   SQL identifier list. Spatial ordering requires `PRESERVE_ORDER = TRUE`.
 #' @param partitioning Character vector of columns to partition by (Parquet/CSV only).
 #' @param parquet_compression Compression codec for Parquet.
 #' @param parquet_row_group_size Row group size for Parquet.
@@ -73,48 +69,23 @@
 #'           installed DuckDB engine.
 #'   }
 #'   Other major version strings like \code{"v1.4.0"}, \code{"v1.3.0"}, etc., are also supported.
-#' @param geoparquet_version GeoParquet output version: `"V1"` (default, 1.0.0,
-#'   for compatibility with older readers) or `"V2"` (2.0.0, native Parquet
-#'   geometry logical types and geospatial statistics). Parquet output only.
-#'   This is independent of `PARQUET_VERSION` and `duckdb_storage_version`.
-#' @param parquet_spatial_order Logical. If `TRUE`, order Parquet rows by a
-#'   Hilbert index of the active geometry within the dataset extent. Null and
-#'   empty geometries sort last. This adds an extent scan and an external sort
-#'   in DuckDB; it does not collect the dataset into R. Requires a single output
-#'   file (no partitioning). Default is `FALSE`.
+#' @param geoparquet_version Parquet output version: `"V1"` (default, GeoParquet
+#'   1.0.0) or `"V2"` (2.0.0, native geometry types and row-group statistics).
+#'   Independent of `PARQUET_VERSION` and `duckdb_storage_version`.
+#' @param parquet_spatial_order Logical, default `FALSE`. If `TRUE`, order
+#'   Parquet rows by the active geometry's Hilbert index, with null and empty
+#'   geometries last. Requires a single output file (no partitioning) and adds
+#'   a dataset extent scan and sort in DuckDB.
 #' @param parquet_compression_level Optional integer ZSTD compression level.
 #'   Requires `parquet_compression = "zstd"` (or the equivalent COPY option).
 #'
 #' @details
-#' Parquet exports preserve each geometry column's CRS. For lazy input, the
-#' native DuckDB query type is authoritative, including unknown CRS: an R
-#' attribute may be stale after dplyr transformations. The legacy DuckDB
-#' storage mode uses the R attribute when native geometry types lack CRS.
-#' `crs` overrides the
-#' active geometry without changing any other geometry column or the input.
-#'
-#' V2 delegates native geometry serialization and row-group statistics to
-#' DuckDB, and supplies one explicit `geo` metadata block at write time. This
-#' preserves the active geometry, writes full PROJJSON definitions, and pairs
-#' known CRS in the native type and inline PROJJSON in the metadata. DuckDB 2.0
-#' cannot construct native `srid:0`: V2 therefore rejects unknown CRS rather
-#' than silently labelling its coordinates CRS84. V1 writes explicit `crs: null`
-#' when unknown. Geometry types are declared unknown (`geometry_types: []`),
-#' as permitted by the specification; actual
-#' types and bounds remain in native row-group statistics. No whole-dataset
-#' bounding box is incorrectly reused in partition files. No post-write file
-#' rewriting or R-side geometry serialization is performed for lazy inputs.
-#' V1 supports XY and XYZ geometries. Measured geometries (XYM or XYZM)
-#' require V2; V1 rejects them without dropping their measures. All geometry
-#' columns must be top-level. Column names must be unique ignoring ASCII case,
-#' as required by DuckDB's identifier rules.
-#'
-#' Spatial ordering, ZSTD compression, and a row-group size around 100000 are
-#' optional distribution optimizations, not requirements of GeoParquet 2.0.
-#' Defaults are not changed automatically when selecting V2.
-#' Spatial ordering currently requires a single output file. DuckDB does not
-#' preserve the requested order in partitioned output, so combining
-#' `parquet_spatial_order = TRUE` with `partitioning` or `PARTITION_BY` is rejected.
+#' Parquet exports preserve the active and secondary geometry columns and their
+#' CRS. Lazy exports use the current query's native CRS, with the stored CRS
+#' attribute as a fallback for legacy DuckDB storage.
+#' V1 supports XY/XYZ; measured XYM/XYZM geometries require V2.
+#' Geometry columns must be top-level, and column names must be unique ignoring
+#' ASCII case.
 #'
 #' @return The `path` invisibly.
 #' 
@@ -143,12 +114,8 @@
 #' ddbs_write_dataset(ds, "output.gpkg")
 #' ddbs_write_dataset(ds, "output.parquet")
 #'
-#' # GeoParquet 2.0 with optional distribution optimizations
-#' ddbs_write_dataset(
-#'   ds, "output_v2.parquet", geoparquet_version = "V2",
-#'   parquet_spatial_order = TRUE, parquet_compression = "zstd",
-#'   parquet_compression_level = 15, parquet_row_group_size = 100000
-#' )
+#' # Opt in to GeoParquet 2.0
+#' ddbs_write_dataset(ds, "output_v2.parquet", geoparquet_version = "V2")
 #' 
 #' # Explicit GDAL driver for non-standard extension
 #' ddbs_write_dataset(ds, "mydata.dat", gdal_driver = "GeoJSON")
@@ -364,6 +331,8 @@ ddbs_write_dataset <- function(
     }
     
     if (!has_geometry_type) {
+         # Double check if maybe it's named 'geometry' but not typed yet (rare in valid spatial tables)
+         # Using DuckDB spatial, it should be GEOMETRY.
          cli::cli_abort("Input DuckDB table/query does not contain a spatial column of type 'GEOMETRY'.")
     }
 
@@ -383,6 +352,8 @@ ddbs_write_dataset <- function(
     }
     
   } else if (inherits(data, c("sf", "data.frame"))) {
+    
+    # Strict Local Validation: Must be 'sf'
     if (!inherits(data, "sf")) {
        cli::cli_abort("Input local data must be an 'sf' object. Plain data.frames are not supported.")
     }
@@ -413,6 +384,7 @@ ddbs_write_dataset <- function(
            if (length(col_names) > 0) {
                # Check for potentially conflicting columns (e.g. FID in GeoPackage)
                if (!is.null(driver_name) && driver_name == "GPKG" && any(toupper(col_names) == "FID")) {
+                   # Rename conflicting FID column
                    q_cols_list <- lapply(col_names, function(col) {
                        q <- DBI::dbQuoteIdentifier(conn, col)
                        if (toupper(col) == "FID") return(paste0(q, " AS FID_original"))
@@ -445,40 +417,60 @@ ddbs_write_dataset <- function(
   
   # 6. Build COPY options (native Parquet is handled above)
   copy_ops <- list()
+  
+  # Format
   if (is_csv) {
       copy_ops$FORMAT <- "CSV"
   } else {
+      # GDAL
       copy_ops$FORMAT <- "GDAL"
       copy_ops$DRIVER <- driver_name
+      
+      # Default layer creation options for GDAL if not provided
       if (is.null(layer_creation_options)) {
           layer_creation_options <- "WRITE_BBOX=YES"
       }
+      
+      # Pass SRS if available
       if (!is.null(crs)) {
           copy_ops$SRS <- crs
       }
   }
   
+  # Options: Overwrite (Native only)
   if (is_native && overwrite) {
       copy_ops$OVERWRITE_OR_IGNORE <- TRUE
   }
+  
+  # Options: Parquet Compression
   if (!is.null(parquet_compression)) {
       copy_ops$COMPRESSION <- parquet_compression
   }
+  
+  # Options: Row Group Size
   if (!is.null(parquet_row_group_size)) {
       copy_ops$ROW_GROUP_SIZE <- as.integer(parquet_row_group_size)
   }
+  
+  # Options: Partitioning (Native only)
   if (!is.null(partitioning) && length(partitioning) > 0) {
      p_cols <- paste(partitioning, collapse = ", ")
      copy_ops$PARTITION_BY <- paste0("(", p_cols, ")")
   }
+  
+  # Options: Layer Creation (GDAL only)
   if (!is.null(layer_creation_options)) {
       copy_ops$LAYER_CREATION_OPTIONS <- layer_creation_options
   }
+  
+  # Merge Generic Options
   if (length(options) > 0) {
       copy_ops <- utils::modifyList(copy_ops, options)
   }
   
   # 7. Execute COPY
+  
+  # Helper to format options
   fmt_opts <- function(ops) {
       parts <- vapply(names(ops), function(n) {
           val <- ops[[n]]
@@ -487,6 +479,8 @@ ddbs_write_dataset <- function(
           } else if (is.numeric(val)) {
               val_str <- as.character(val)
           } else {
+              # String: handle single quotes escaping if needed, though rare in options
+              # PARTITION_BY handled specially (starts with parens)
               if (grepl("^\\(", val)) {
                   val_str <- val 
               } else {
@@ -504,6 +498,7 @@ ddbs_write_dataset <- function(
   tryCatch({
       DBI::dbExecute(conn, query)
   }, finally = {
+      # Cleanup temp view if we created one
       if (!is.null(view_name)) {
           duckdb::duckdb_unregister(conn, view_name)
       }
@@ -554,52 +549,6 @@ ddbs_write_duckdb_dataset <- function(
   invisible(path)
 }
 
-#' Convert an sf CRS to DuckDB GEOMETRY CRS text for GeoParquet writes
-#' @noRd
-ddbs_write_dataset_crs_text <- function(crs, conn) {
-    if (is.null(crs) || is.na(crs)) {
-        return(NULL)
-    }
-
-    epsg <- crs$epsg
-    if (!is.null(epsg) && length(epsg) > 0 && !is.na(epsg)) {
-        return(paste0("EPSG:", as.integer(epsg)))
-    }
-
-    wkt <- crs$wkt
-    if (is.null(wkt) || length(wkt) == 0 || is.na(wkt) || identical(wkt, "")) {
-        cli::cli_abort(
-            "DuckDB GeoParquet export requires PROJJSON CRS metadata for custom or non-EPSG CRS values, but the input CRS has no WKT representation."
-        )
-    }
-
-    projjson <- tryCatch(
-        {
-            sf::st_as_text(crs, projjson = TRUE)
-        },
-        error = function(e) {
-            cli::cli_abort(
-                c(
-                    "DuckDB GeoParquet export requires PROJJSON CRS metadata for custom or non-EPSG CRS values.",
-                    "x" = "{.fun sf::st_as_text} failed to convert the input CRS to PROJJSON.",
-                    "i" = conditionMessage(e)
-                )
-            )
-        }
-    )
-
-    if (!grepl("^\\s*\\{", projjson) || !grepl("\\}\\s*$", projjson)) {
-        cli::cli_abort(
-            c(
-                "DuckDB GeoParquet export requires PROJJSON CRS metadata for custom or non-EPSG CRS values.",
-                "x" = "{.fun sf::st_as_text} did not return a PROJJSON object."
-            )
-        )
-    }
-
-    projjson
-}
-
 #' Helper to extract connection from object
 #' @noRd
 extract_connection <- function(x) {
@@ -607,6 +556,7 @@ extract_connection <- function(x) {
         return(dbplyr::remote_con(x))
     }
     if (inherits(x, "tbl_lazy")) {
+        # Check if src is duckdb
         con <- dbplyr::remote_con(x)
         if (inherits(con, "duckdb_connection")) return(con)
     }

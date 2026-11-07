@@ -78,7 +78,7 @@ ddbs_geoparquet_projjson <- function(crs) {
 }
 
 #' @noRd
-ddbs_geoparquet_cast <- function(expr, crs, conn, version) {
+ddbs_geoparquet_cast <- function(expr, crs, projjson, conn, version) {
   # V1 uses ordinary WKB BLOB columns and explicit geo metadata.
   if (version == "V1") {
     # GeoParquet 1.0 permits XY/XYZ, but not measured WKB. Check while
@@ -101,11 +101,12 @@ ddbs_geoparquet_cast <- function(expr, crs, conn, version) {
   }
   text <- if (is.na(crs)) {
     NULL
-  } else if (version == "V2") {
-    as.character(jsonlite::toJSON(ddbs_geoparquet_projjson(crs),
-                                 auto_unbox = TRUE, null = "null", digits = NA))
+  } else if (version != "V2" && !is.na(crs$epsg)) {
+    # Preserve the native BOTH/NONE compatibility modes' authority strings.
+    paste0("EPSG:", as.integer(crs$epsg))
   } else {
-    ddbs_write_dataset_crs_text(crs, conn)
+    as.character(jsonlite::toJSON(projjson, auto_unbox = TRUE,
+                                 null = "null", digits = NA))
   }
   if (is.null(text)) return(paste0("CAST(", expr, " AS GEOMETRY)"))
   # Assign output CRS without reprojection or mutation of source.
@@ -114,14 +115,13 @@ ddbs_geoparquet_cast <- function(expr, crs, conn, version) {
 }
 
 #' @noRd
-ddbs_geoparquet_metadata <- function(crses, primary, version) {
-  columns <- lapply(crses, function(crs) {
+ddbs_geoparquet_metadata <- function(projjson, primary, version) {
+  columns <- lapply(projjson, function(crs) {
     list(encoding = "WKB", geometry_types = character(),
-         crs = ddbs_geoparquet_projjson(crs))
+         crs = crs)
   })
-  # An empty geometry_types array explicitly means unknown in the spec. Do not
-  # calculate a whole-dataset bbox/type list and incorrectly reuse it for each
-  # partition. DuckDB records the actual types/extents per native row group.
+  # Unknown types and no file-wide bbox also describe partitions correctly;
+  # DuckDB supplies native statistics for each row group.
   as.character(jsonlite::toJSON(
     list(version = version, primary_column = primary, columns = columns),
     auto_unbox = TRUE, null = "null", digits = NA
@@ -140,7 +140,7 @@ ddbs_geoparquet_copy_options <- function(conn, options) {
         cli::cli_abort("{.code options$KV_METADATA} must be a named list of strings.")
       }
       entries <- vapply(names(value), function(name) {
-        paste0(DBI::dbQuoteIdentifier(conn, name), ": ",
+        paste0(sql_ident(name), ": ",
                DBI::dbQuoteString(conn, value[[name]]))
       }, character(1))
       return(paste0(key, " {", paste(entries, collapse = ", "), "}"))
@@ -196,6 +196,7 @@ ddbs_write_geoparquet <- function(data, path, conn, overwrite, crs, options,
   resolved <- ddbs_geoparquet_options(options, version, version_explicit)
   version <- resolved$version
   options <- resolved$options
+  managed_metadata <- version %in% c("V1", "V2")
   if (!is.logical(spatial_order) || length(spatial_order) != 1L || is.na(spatial_order)) {
     cli::cli_abort("{.arg parquet_spatial_order} must be TRUE or FALSE.")
   }
@@ -207,7 +208,7 @@ ddbs_write_geoparquet <- function(data, path, conn, overwrite, crs, options,
     options$PARTITION_BY <- NULL
   }
   if (!is.null(partitioning) && (!is.character(partitioning) || anyNA(partitioning) ||
-                               any(!nzchar(partitioning)) || anyDuplicated(partitioning))) {
+                               any(!nzchar(partitioning)))) {
     cli::cli_abort("{.arg partitioning} must contain unique, non-missing column names.")
   }
   if (spatial_order && length(partitioning)) {
@@ -227,12 +228,11 @@ ddbs_write_geoparquet <- function(data, path, conn, overwrite, crs, options,
     cli::cli_abort("File {.path {path}} already exists. Use {.arg overwrite = TRUE} to replace.")
   }
 
-  quote_id <- function(x) as.character(DBI::dbQuoteIdentifier(conn, x))
   override <- if (!is.null(crs)) ddbs_geoparquet_crs(crs) else NULL
-  if (inherits(data, "sf")) {
-    # DuckDB repairs case-insensitive name collisions when registering data.
-    # Resolving the original names afterwards could select the first column
-    # twice and silently replace the other column's values.
+  local_sf <- inherits(data, "sf")
+  if (local_sf) {
+    # Registration repairs name collisions, which could silently select the
+    # wrong original column. Reject them before registering.
     folded_names <- chartr("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz",
                            names(data))
     if (anyDuplicated(folded_names)) {
@@ -240,7 +240,6 @@ ddbs_write_geoparquet <- function(data, path, conn, overwrite, crs, options,
     }
     primary <- attr(data, "sf_column", exact = TRUE)
     geometry <- names(data)[vapply(data, inherits, logical(1), what = "sfc")]
-    # [.sf can keep the active geometry implicitly; use an ordinary named list.
     crses <- stats::setNames(lapply(geometry, function(name) sf::st_crs(data[[name]])), geometry)
     if (!is.null(override)) crses[[primary]] <- override
     registered <- as.data.frame(data)
@@ -248,24 +247,17 @@ ddbs_write_geoparquet <- function(data, path, conn, overwrite, crs, options,
     view <- ddbs_temp_view_name()
     duckdb::duckdb_register(conn, view, registered)
     on.exit(duckdb::duckdb_unregister(conn, view), add = TRUE)
-    source <- quote_id(view)
+    source <- sql_ident(view)
     fields <- names(registered)
-    expressions <- stats::setNames(quote_id(fields), fields)
-    for (name in geometry) {
-      expressions[[name]] <- ddbs_geoparquet_cast(
-        paste0("ST_GeomFromWKB(", quote_id(name), ")"), crses[[name]], conn, version)
-    }
   } else if (inherits(data, c("duckspatial_df", "tbl_lazy", "tbl_duckdb_connection"))) {
     if (!identical(conn, dbplyr::remote_con(data))) {
       cli::cli_abort("Parquet export must use the input lazy table's DuckDB connection.")
     }
-    # Never use source_table here: it can be stale after dplyr filtering,
-    # selecting, renaming, or joins that do not have a duckspatial method.
+    # source_table can be stale after filtering, renaming or joins.
     source <- paste0("(", dbplyr::sql_render(data, con = conn), ")")
     types <- DBI::dbGetQuery(conn, paste0("DESCRIBE SELECT * FROM ", source))
-    # Remove SQL string literals and quoted identifiers before matching type
-    # tokens. Enum labels, CRS text and STRUCT field names may themselves
-    # contain "GEOMETRY[]"; only actual geometry types are spatial columns.
+    # Enum labels, CRS text and STRUCT field names can contain "GEOMETRY[]".
+    # Strip quoted text before identifying actual geometry types.
     type_tokens <- gsub("'(?:[^']|'')*'|\"(?:[^\"]|\"\")*\"", "",
                         types$column_type, perl = TRUE)
     is_geometry <- grepl("^GEOMETRY(\\(\\))?$", type_tokens)
@@ -285,10 +277,8 @@ ddbs_write_geoparquet <- function(data, path, conn, overwrite, crs, options,
       if (identical(name, primary) && !is.null(override)) return(override)
       ddbs_geoparquet_native_crs(conn, types$column_type[match(name, types$column_name)])
     }), geometry)
-    # Native query types are authoritative, even when a CRS is intentionally
-    # cleared. The R attribute can be stale after mutate(). Only a legacy
-    # DuckDB storage connection (which cannot represent CRS in GEOMETRY types)
-    # may use its duckspatial-managed CRS attribute as a fallback.
+    # Native CRS overrides stale R attributes. Legacy storage cannot store CRS
+    # in its geometry types, so only it may fall back to the R attribute.
     if (is.null(override) && has_active && is.na(crses[[primary]]) &&
         inherits(data, "duckspatial_df") && ddbs_storage_is_legacy(conn)) {
       stored <- attr(data, "crs", exact = TRUE)
@@ -297,18 +287,13 @@ ddbs_write_geoparquet <- function(data, path, conn, overwrite, crs, options,
       }
     }
     fields <- types$column_name
-    expressions <- stats::setNames(quote_id(fields), fields)
-    for (name in geometry) {
-      expressions[[name]] <- ddbs_geoparquet_cast(quote_id(name), crses[[name]], conn, version)
-    }
   } else if (inherits(data, "data.frame")) {
     cli::cli_abort("Input local data must be an 'sf' object. Plain data.frames are not supported.")
   } else {
     cli::cli_abort("Unsupported input type: {.cls {class(data)}}")
   }
 
-  # DuckDB resolves both bare and quoted identifiers without ASCII case
-  # sensitivity. Match its behavior before checking duplicate/geometry keys.
+  # Match DuckDB's ASCII case-insensitive identifiers before validating keys.
   partition_index <- match(
     chartr("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz", partitioning),
     chartr("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz", fields)
@@ -323,15 +308,25 @@ ddbs_write_geoparquet <- function(data, path, conn, overwrite, crs, options,
   if (length(intersect(partitioning, geometry))) {
     cli::cli_abort("Geometry columns cannot be used as partition keys.")
   }
-  # Keep the active geometry first among geometry fields for readers that use
-  # column order rather than primary_column, without moving attribute columns.
+  # Some readers use column order instead of primary_column.
   fields[fields %in% geometry] <- c(primary, setdiff(geometry, primary))
-  expressions <- expressions[fields]
-  select <- paste0(unname(expressions), " AS ", quote_id(fields), collapse = ", ")
+  # Reuse each CRS definition for the native type and footer metadata.
+  projjson <- lapply(crses, function(crs) {
+    if (!managed_metadata && !is.na(crs$epsg)) return(NULL)
+    ddbs_geoparquet_projjson(crs)
+  })
+  expressions <- stats::setNames(sql_ident(fields), fields)
+  for (name in geometry) {
+    expr <- expressions[[name]]
+    if (local_sf) expr <- paste0("ST_GeomFromWKB(", expr, ")")
+    expressions[[name]] <- ddbs_geoparquet_cast(
+      expr, crses[[name]], projjson[[name]], conn, version)
+  }
+  select <- paste0(unname(expressions), " AS ", sql_ident(fields), collapse = ", ")
   query <- paste0("SELECT ", select, " FROM ", source)
   if (spatial_order) {
-    geom <- paste0("_ddbs_src.", quote_id(primary))
-    bounds_geom <- quote_id(primary)
+    geom <- paste0("_ddbs_src.", sql_ident(primary))
+    bounds_geom <- sql_ident(primary)
     if (version == "V1") {
       # V1 selects WKB BLOBs; decode only for spatial ordering.
       geom <- paste0("ST_GeomFromWKB(", geom, ")")
@@ -362,7 +357,7 @@ ddbs_write_geoparquet <- function(data, path, conn, overwrite, crs, options,
   # multi-file writer modes through DuckDB's own COPY validation.
   if (spatial_order) copy$PRESERVE_ORDER <- TRUE
   if (length(partitioning)) {
-    copy$PARTITION_BY <- DBI::SQL(paste0("(", paste(quote_id(partitioning), collapse = ", "), ")"))
+    copy$PARTITION_BY <- DBI::SQL(paste0("(", paste(sql_ident(partitioning), collapse = ", "), ")"))
   }
   if (!is.null(copy$ROW_GROUP_SIZE) &&
       (!is.numeric(copy$ROW_GROUP_SIZE) || length(copy$ROW_GROUP_SIZE) != 1L ||
@@ -380,16 +375,12 @@ ddbs_write_geoparquet <- function(data, path, conn, overwrite, crs, options,
       cli::cli_abort("A compression level requires {.code parquet_compression = 'zstd'}.")
     }
   }
-  if (version %in% c("V1", "V2")) {
-    # DuckDB Spatial upstream issue #847:
+  if (managed_metadata) {
+    # Explicit metadata covers measured V2 (duckdb/duckdb-spatial#847):
     # https://github.com/duckdb/duckdb-spatial/issues/847
-    # DuckDB's automatic GeoParquet V2 metadata can omit the 'geo' footer for
-    # measured M/ZM geometries. Keep our explicit geo KV_METADATA for now.
-    # Revisit when the upstream issue is fixed, but do not remove this path
-    # without testing other requirements too: unknown CRS in V1, multiple
-    # geometry columns, primary-column selection and empty files.
-    # NONE disables DuckDB's automatic geo metadata. V2 keeps native geometry
-    # logical types/statistics; V1 explicitly selects WKB BLOBs instead.
+    # Remove only when native COPY also preserves zero-row files, all geometry
+    # columns/primary selection and unknown V1 CRS. A #847 fix alone is insufficient.
+    # NONE disables automatic metadata; V2 keeps native types/statistics.
     copy$GEOPARQUET_VERSION <- "NONE"
     metadata <- copy$KV_METADATA
     if (is.null(metadata)) metadata <- list()
@@ -400,7 +391,7 @@ ddbs_write_geoparquet <- function(data, path, conn, overwrite, crs, options,
       cli::cli_abort("The {.code geo} metadata key is managed by duckspatial.")
     }
     metadata$geo <- ddbs_geoparquet_metadata(
-      crses, primary, if (version == "V2") "2.0.0" else "1.0.0"
+      projjson, primary, if (version == "V2") "2.0.0" else "1.0.0"
     )
     copy$KV_METADATA <- metadata
   }
