@@ -1,0 +1,14 @@
+{
+  "typed_single_xy": "SELECT ST_Point(5, 6)::GEOMETRY('EPSG:3857') AS geometry",
+  "unqualified_xy": "SELECT ST_Point(500000, 6000000)::GEOMETRY AS geometry",
+  "typed_two_columns": "SELECT ST_Point(1,2)::GEOMETRY('EPSG:4326') AS shape, ST_Point(500000,6000000)::GEOMETRY('EPSG:3857') AS other",
+  "renamed_typed_two": "SELECT shape AS renamed, other FROM (SELECT ST_Point(1,2)::GEOMETRY('EPSG:4326') AS shape, ST_Point(500000,6000000)::GEOMETRY('EPSG:3857') AS other)",
+  "empty_typed_single": "SELECT ST_Point(5,6)::GEOMETRY('EPSG:3857') AS geometry WHERE FALSE",
+  "empty_typed_two": "SELECT ST_Point(1,2)::GEOMETRY('EPSG:4326') AS shape, ST_Point(500000,6000000)::GEOMETRY('EPSG:3857') AS other WHERE FALSE",
+  "typed_measured_point": "SELECT ST_GeomFromText('POINT M (1 2 3)')::GEOMETRY('EPSG:3857') AS geometry",
+  "typed_measured_zm": "SELECT ST_GeomFromText('LINESTRING ZM (0 0 1 2, 1 1 3 4)')::GEOMETRY('EPSG:3857') AS geometry",
+  "untyped_measured_zm": "SELECT ST_GeomFromText('LINESTRING ZM (0 0 1 2, 1 1 3 4)') AS geometry",
+  "typed_nonpoint": "SELECT ST_GeomFromText('LINESTRING (0 0, 1 1)')::GEOMETRY('EPSG:3857') AS geometry",
+  "mixed_measured_rows": "SELECT ST_GeomFromText(wkt)::GEOMETRY('EPSG:4326') AS geometry FROM (VALUES ('POINT (1 2)'), ('POINT M (3 4 5)')) t(wkt)",
+  "filtered_mixed_measured": "SELECT geometry FROM (SELECT id, ST_GeomFromText(wkt)::GEOMETRY('EPSG:4326') AS geometry FROM (VALUES (1,'POINT (1 2)'), (2,'POINT M (3 4 5)')) t(id,wkt)) WHERE id = 1"
+}
