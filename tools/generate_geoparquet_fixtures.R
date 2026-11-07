@@ -16,6 +16,8 @@ x <- sf::st_sf(
   geometry = sf::st_sfc(sf::st_point(c(1, 2)), sf::st_point(c(3, 4)), crs = 4326)
 )
 write_fixture(x, "gp-v1.parquet", crs = NA)
+write_fixture(x, "gp-v1.1.parquet", "V1.1")
+write_fixture(x, "unknown-v1.1.parquet", "V1.1", crs = NA)
 write_fixture(x, "gp-v2.parquet", "V2")
 
 # Active geometry is deliberately second among two differently projected columns.
@@ -27,7 +29,7 @@ multi <- sf::st_sf(
                         sf::st_point(c(3000, 4000)), sf::st_point(), crs = 3857),
   sf_column_name = "geometry"
 )
-for (version in c("V1", "V2")) {
+for (version in c("V1", "V1.1", "V2")) {
   tag <- tolower(version)
   write_fixture(multi, paste0("multi-", tag, ".parquet"), version,
                 parquet_spatial_order = TRUE, parquet_compression = "zstd",
@@ -52,8 +54,8 @@ DBI::dbExecute(con, paste0(
   ") t(id, wkt)"
 ))
 lazy <- dplyr::tbl(con, "gp_dimensions")
-for (version in c("V1", "V2")) {
-  selected <- if (version == "V1") dplyr::filter(lazy, id %in% c(1L, 2L, 5L, 6L)) else lazy
+for (version in c("V1", "V1.1", "V2")) {
+  selected <- if (version != "V2") dplyr::filter(lazy, id %in% c(1L, 2L, 5L, 6L)) else lazy
   selected <- dplyr::mutate(selected, id = id * 10L)
   selected <- dplyr::rename(selected, shape = geometry)
   write_fixture(selected, paste0("dimensions-", tolower(version), ".parquet"),
@@ -73,6 +75,7 @@ write_fixture(projected, "transformed-v2.parquet", "V2")
 custom <- x
 sf::st_crs(custom) <- NA
 sf::st_crs(custom) <- "+proj=aeqd +lat_0=52 +lon_0=13 +datum=WGS84 +units=m +no_defs"
+write_fixture(custom, "custom-v1.1.parquet", "V1.1")
 write_fixture(custom, "custom-v2.parquet", "V2")
 
 # Non-point WKB preserves every vertex, interior ring and dimension. The Python
@@ -105,9 +108,9 @@ DBI::dbExecute(con, paste0(
   "ORDER BY (id * 7919) % 6000"
 ))
 ordered_groups <- dplyr::tbl(con, "gp_ordered_groups")
-for (version in c("V1", "V2")) {
+for (version in c("V1", "V1.1", "V2")) {
   tag <- tolower(version)
-  selected <- if (version == "V1") dplyr::filter(nonpoint, id <= 9L) else nonpoint
+  selected <- if (version != "V2") dplyr::filter(nonpoint, id <= 9L) else nonpoint
   write_fixture(selected, paste0("nonpoint-", tag, ".parquet"), version)
   write_fixture(ordered_groups, paste0("ordered-row-groups-", tag, ".parquet"),
                 version, parquet_spatial_order = TRUE,
