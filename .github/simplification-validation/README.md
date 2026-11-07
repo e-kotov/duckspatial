@@ -7,7 +7,7 @@ unchanged #7/#8 references are checked out separately at the exact SHAs in
 ## Running
 
 Push changes to `validation/geoparquet-simplification-20261107`. The workflow
-uses `sources.json` to choose one of two stages:
+uses `sources.json` to choose a stage:
 
 - `documentation`: regenerate the candidate's help with roxygen2 8.1.1, and
   publish the generated `.Rd` plus the diff as an artifact and in the job log.
