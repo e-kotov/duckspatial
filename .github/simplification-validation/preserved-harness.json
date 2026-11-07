@@ -1,0 +1,10 @@
+{
+  "source_sha": "233b033d221dc2913d56e2ba431370f50e93e722",
+  "files": {
+    ".github/upstream-validation/interop/generate_geoparquet_fixtures.R": "2db4b31efe7c08ee57d62e933377a84bd74443bf3e3caff1f6ef4c18fea56497",
+    ".github/upstream-validation/interop/run_core_conformance.py": "52f8137331438889b559c7e8774f2b3123f519c19833b6c2ad9ac2da0f986da2",
+    ".github/upstream-validation/interop/validate_geoparquet.py": "f31a7a1271332ecc3f3f38e4285b3b9cd4144783e5f15e5e4546c9609d77d609",
+    ".github/upstream-validation/interop/validate_geoparquet_readers.py": "8cc8280ae37119c8b01f4d798558e29206735efd830ebddd7f7013a1ea7ebb07",
+    ".github/upstream-validation/windows-test-supervisor.py": "6af4fd4d287ae3f15b7a6c34b706c8fb43d8ae4640c84b6490896815e16fe923"
+  }
+}

@@ -172,7 +172,7 @@ jobs:
         run: |
           python3 harness/.github/simplification-validation/source-integrity.py --workspace . --output evidence/source-integrity.json
           Rscript harness/.github/simplification-validation/environment.R evidence/environment
-      - name: Full reference #7 check in the same Linux environment
+      - name: "Full reference #7 check in the same Linux environment"
         if: matrix.config.os == 'ubuntu-24.04' && matrix.config.r == 'release'
         timeout-minutes: 12
         uses: r-lib/actions/check-r-package@v2
@@ -188,7 +188,7 @@ jobs:
           working-directory: candidate
           upload-results: 'true'
           artifact-name: simplification-candidate-${{ matrix.config.os }}-${{ matrix.config.r }}
-      - name: Full reference #8 check in the same Linux environment
+      - name: "Full reference #8 check in the same Linux environment"
         if: ${{ !cancelled() && steps.dependencies.outcome == 'success' && matrix.config.os == 'ubuntu-24.04' && matrix.config.r == 'release' }}
         timeout-minutes: 12
         uses: r-lib/actions/check-r-package@v2
