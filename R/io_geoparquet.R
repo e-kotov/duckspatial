@@ -381,6 +381,13 @@ ddbs_write_geoparquet <- function(data, path, conn, overwrite, crs, options,
     }
   }
   if (version %in% c("V1", "V2")) {
+    # DuckDB Spatial upstream issue #847:
+    # https://github.com/duckdb/duckdb-spatial/issues/847
+    # DuckDB's automatic GeoParquet V2 metadata can omit the 'geo' footer for
+    # measured M/ZM geometries. Keep our explicit geo KV_METADATA for now.
+    # Revisit when the upstream issue is fixed, but do not remove this path
+    # without testing other requirements too: unknown CRS in V1, multiple
+    # geometry columns, primary-column selection and empty files.
     # NONE disables DuckDB's automatic geo metadata. V2 keeps native geometry
     # logical types/statistics; V1 explicitly selects WKB BLOBs instead.
     copy$GEOPARQUET_VERSION <- "NONE"
