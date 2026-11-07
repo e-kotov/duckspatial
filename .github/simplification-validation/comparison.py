@@ -21,7 +21,7 @@ def show_test_logs(directory, label):
     for suffix in ("stdout.log", "stderr.log", "totals.json"):
         path = directory / f"{label}-{suffix}"
         print(f"::group::{label} {suffix}", flush=True)
-        print(path.read_text(errors="replace") if path.exists() else "Not produced", flush=True)
+        print(path.read_text(encoding="utf-8", errors="replace") if path.exists() else "Not produced", flush=True)
         print("::endgroup::", flush=True)
 
 

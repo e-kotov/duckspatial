@@ -34,6 +34,6 @@ def run(command, *, cwd, env, output, timeout):
             code = proc.wait(timeout=20)
     record.update(exit_code=code, elapsed_seconds=round(time.monotonic() - started, 3))
     output.with_suffix(".json").write_text(json.dumps(record, indent=2) + "\n")
-    print(output.with_suffix(".log").read_text(errors="replace")[-6000:], flush=True)
+    print(output.with_suffix(".log").read_text(encoding="utf-8", errors="replace")[-6000:], flush=True)
     print(json.dumps(record), flush=True)
     return record["reason"] == "success"

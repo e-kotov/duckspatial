@@ -1,5 +1,5 @@
 {
-  "mode": "validate",
+  "mode": "windows",
   "base": "677ed965894f20b5f83bdc6a389f42ccddb6a7ba",
   "reference7": "04c34956cb71d2ab6d23072fc9774e9c4d09bc8d",
   "candidate": "22de905bc18988c4cd0e56eafe6cb6dba50248ae",

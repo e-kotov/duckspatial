@@ -17,6 +17,8 @@ uses `sources.json` to choose a stage:
 - `probe`: characterize missing, empty and quoted identifiers against the
   unchanged #7 and candidate, in isolated installed packages. This diagnostic
   records behavior differences; it does not replace the regression checks.
+- `windows`: rerun only the paired Windows checks after a Windows-specific
+  harness failure, retaining the exact sources and strict process-exit gates.
 
 The paired Linux and Windows jobs install all package dependencies once, then
 install each of the four source packages into separate libraries. The original
