@@ -10,5 +10,8 @@
   "untyped_measured_zm": "SELECT ST_GeomFromText('LINESTRING ZM (0 0 1 2, 1 1 3 4)') AS geometry",
   "typed_nonpoint": "SELECT ST_GeomFromText('LINESTRING (0 0, 1 1)')::GEOMETRY('EPSG:3857') AS geometry",
   "mixed_measured_rows": "SELECT ST_GeomFromText(wkt)::GEOMETRY('EPSG:4326') AS geometry FROM (VALUES ('POINT (1 2)'), ('POINT M (3 4 5)')) t(wkt)",
-  "filtered_mixed_measured": "SELECT geometry FROM (SELECT id, ST_GeomFromText(wkt)::GEOMETRY('EPSG:4326') AS geometry FROM (VALUES (1,'POINT (1 2)'), (2,'POINT M (3 4 5)')) t(id,wkt)) WHERE id = 1"
+  "filtered_mixed_measured": "SELECT geometry FROM (SELECT id, ST_GeomFromText(wkt)::GEOMETRY('EPSG:4326') AS geometry FROM (VALUES (1,'POINT (1 2)'), (2,'POINT M (3 4 5)')) t(id,wkt)) WHERE id = 1",
+  "mixed_measured_two_columns": "SELECT ST_GeomFromText(wkt)::GEOMETRY('EPSG:4326') AS shape, ST_Point(1,2)::GEOMETRY('EPSG:3857') AS other FROM (VALUES ('POINT (1 2)'), ('POINT M (3 4 5)')) t(wkt)",
+  "mixed_measured_two_columns_filtered": "SELECT shape, other FROM (SELECT id, ST_GeomFromText(wkt)::GEOMETRY('EPSG:4326') AS shape, ST_Point(1,2)::GEOMETRY('EPSG:3857') AS other FROM (VALUES (1,'POINT (1 2)'), (2,'POINT M (3 4 5)')) t(id,wkt)) WHERE id = 1",
+  "null_first_row_typed_two": "SELECT CASE WHEN id = 1 THEN NULL ELSE ST_Point(id,id) END::GEOMETRY('EPSG:4326') AS shape, ST_Point(id,id)::GEOMETRY('EPSG:3857') AS other FROM range(1,3) t(id)"
 }
