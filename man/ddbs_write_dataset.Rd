@@ -179,4 +179,3 @@ For advanced features like cloud storage (S3) support, the
 \seealso{
 \code{\link[=ddbs_drivers]{ddbs_drivers()}} to list all available GDAL drivers and formats.
 }
-
