@@ -69,7 +69,7 @@ def check_file(path, version, primary, crses, expected, compression=None):
                 assert shapely.equals_identical(got, shapely.from_wkt(want)), (
                     path, row["id"], name, shapely.to_wkt(got), want
                 )
-                if version == "1.0.0":
+                if version != "2.0.0":
                     assert geometry_type(value) in set(range(1, 8)) | set(range(1001, 1008)), path
 
         for group_index in range(parquet.num_row_groups):
@@ -79,7 +79,7 @@ def check_file(path, version, primary, crses, expected, compression=None):
             values = parquet.read_row_group(group_index, columns=[name]).column(0).to_pylist()
             values = [v for v in values if v is not None]
             stats = chunk.geo_statistics
-            if version == "1.0.0":
+            if version != "2.0.0":
                 assert stats is None, path
                 continue
             if not values:
@@ -102,6 +102,8 @@ def check_file(path, version, primary, crses, expected, compression=None):
 
 base = {1: {"geometry": "POINT (1 2)"}, 2: {"geometry": "POINT (3 4)"}}
 check_file(ROOT / "gp-v1.parquet", "1.0.0", "geometry", {"geometry": None}, base)
+check_file(ROOT / "gp-v1.1.parquet", "1.1.0", "geometry", {"geometry": 4326}, base)
+check_file(ROOT / "unknown-v1.1.parquet", "1.1.0", "geometry", {"geometry": None}, base)
 check_file(ROOT / "gp-v2.parquet", "2.0.0", "geometry", {"geometry": 4326}, base)
 
 multi = {
@@ -109,7 +111,7 @@ multi = {
     2: {"geometry": "POINT (3000 4000)", "other": "POINT (3 4)"},
     3: {"geometry": "POINT EMPTY", "other": "POINT (5 6)"},
 }
-for tag, version in (("v1", "1.0.0"), ("v2", "2.0.0")):
+for tag, version in (("v1", "1.0.0"), ("v1.1", "1.1.0"), ("v2", "2.0.0")):
     crses = {"geometry": 3857, "other": 4326}
     check_file(ROOT / f"multi-{tag}.parquet", version, "geometry", crses, multi, "ZSTD")
     check_file(ROOT / f"empty-{tag}.parquet", version, "geometry", crses, {})
@@ -129,8 +131,8 @@ wkts = {
     50: "POINT EMPTY", 60: None, 70: "POINT M EMPTY",
     80: "GEOMETRYCOLLECTION ZM (POINT ZM (13 14 15 16))",
 }
-for tag, version in (("v1", "1.0.0"), ("v2", "2.0.0")):
-    ids = (10, 20, 50, 60) if tag == "v1" else wkts.keys()
+for tag, version in (("v1", "1.0.0"), ("v1.1", "1.1.0"), ("v2", "2.0.0")):
+    ids = (10, 20, 50, 60) if tag != "v2" else wkts.keys()
     expected = {
         i: {"shape": wkts[i], "other": None if i == 20 else f"POINT ({i} {2 * i})"}
         for i in ids
@@ -139,6 +141,7 @@ for tag, version in (("v1", "1.0.0"), ("v2", "2.0.0")):
     check_file(ROOT / f"dimensions-{tag}.parquet", version, "shape", crses, expected)
     check_file(ROOT / f"null-{tag}.parquet", version, "shape", crses, {60: expected[60]})
 
+check_file(ROOT / "custom-v1.1.parquet", "1.1.0", "geometry", {"geometry": CUSTOM}, base)
 check_file(ROOT / "custom-v2.parquet", "2.0.0", "geometry", {"geometry": CUSTOM}, base)
 
 # Use an independent PROJ calculation for the lazy transformed query.
@@ -200,7 +203,7 @@ indices = {i: hilbert_index(int(x * (65535 / 100)), int(y * (65535 / 102)))
 assert len(set(indices.values())) == len(grid)
 expected_order = sorted(grid, key=indices.__getitem__)
 grid_expected = {i: {"geometry": f"POINT ({x} {y})"} for i, (x, y) in grid.items()}
-for tag, version in (("v1", "1.0.0"), ("v2", "2.0.0")):
+for tag, version in (("v1", "1.0.0"), ("v1.1", "1.1.0"), ("v2", "2.0.0")):
     expected = {i: {"geometry": wkt} for i, wkt in nonpoint_wkts.items()
                 if tag == "v2" or i <= 9}
     check_file(ROOT / f"nonpoint-{tag}.parquet", version, "geometry",

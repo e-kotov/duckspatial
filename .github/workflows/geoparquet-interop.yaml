@@ -1,7 +1,7 @@
 name: GeoParquet interoperability
 on:
   pull_request:
-    branches: [main]
+    branches: [main, feat/geoparquet-v2-compliance-20261106]
   workflow_dispatch:
 
 jobs:
@@ -16,16 +16,20 @@ jobs:
         with:
           extra-packages: local::.
           needs: check
+      - name: Run GeoParquet regression tests
+        run: Rscript -e 'testthat::test_local(filter = "geoparquet")'
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
       - name: Install independent Parquet and geometry readers
-        run: python -m pip install 'pyarrow>=26' 'shapely>=2.1' pyproj 'geoparquet-validator>=0.3.1'
-      - name: Generate V1 and V2 files using duckspatial
+        run: python -m pip install 'pyarrow>=26' 'shapely>=2.1' pyproj 'geoparquet-validator>=0.3.1' 'geopandas>=1.1' 'pyogrio>=0.11'
+      - name: Generate V1, V1.1 and V2 files using duckspatial
         run: Rscript tools/generate_geoparquet_fixtures.R
       - name: Independently verify values, CRS, dimensions and row-group statistics
         run: python tools/validate_geoparquet.py
-      - name: Validate V1 and V2 against GeoParquet core conformance rules
+      - name: Check GeoPandas and available GDAL interoperability
+        run: python tools/validate_geoparquet_v11_readers.py
+      - name: Validate V1, V1.1 and V2 against GeoParquet core conformance rules
         shell: bash
         run: |
           while IFS= read -r -d '' file; do
