@@ -1,0 +1,213 @@
+name: GeoParquet simplification validation
+
+on:
+  push:
+    branches: [validation/geoparquet-simplification-20261107]
+    paths:
+      - .github/workflows/simplification-validation.yaml
+      - .github/simplification-validation/**
+      - .github/upstream-validation/interop/**
+      - .github/upstream-validation/windows-test-supervisor.py
+
+permissions:
+  contents: read
+
+env:
+  GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+  NOT_CRAN: 'true'
+
+jobs:
+  plan:
+    name: Verify source configuration
+    runs-on: ubuntu-24.04
+    outputs:
+      mode: ${{ steps.sources.outputs.mode }}
+      reference7: ${{ steps.sources.outputs.reference7 }}
+      candidate: ${{ steps.sources.outputs.candidate }}
+      reference8: ${{ steps.sources.outputs.reference8 }}
+      stack: ${{ steps.sources.outputs.stack }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: sources
+        run: python .github/simplification-validation/plan.py
+
+  documentation:
+    name: Regenerate candidate help with roxygen2
+    needs: plan
+    if: needs.plan.outputs.mode == 'documentation'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: harness
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.plan.outputs.candidate }}
+          path: candidate
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: release
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          working-directory: candidate
+          extra-packages: any::rcmdcheck, any::testthat, any::pkgload, roxygen2@8.1.1, local::.
+          needs: check
+      - name: Regenerate help and preserve the generated result
+        working-directory: candidate
+        run: Rscript ../harness/.github/simplification-validation/document.R generate ../documentation
+      - name: Preserve generated documentation
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: simplification-generated-help
+          path: documentation
+          if-no-files-found: error
+
+  comparison:
+    name: Paired ${{ matrix.os }} regression and interoperability
+    needs: plan
+    if: needs.plan.outputs.mode == 'validate'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: harness
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.plan.outputs.reference7 }}
+          path: reference7
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.plan.outputs.candidate }}
+          path: candidate
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.plan.outputs.reference8 }}
+          path: reference8
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.plan.outputs.stack }}
+          path: stack
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: release
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          working-directory: candidate
+          extra-packages: any::rcmdcheck, any::testthat, any::pkgload, roxygen2@8.1.1, local::.
+          needs: check
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Verify exact sources and unchanged regression files
+        run: python harness/.github/simplification-validation/source-integrity.py --workspace . --output evidence/source-integrity.json
+      - name: Install independent file readers in the shared environment
+        if: runner.os != 'Windows'
+        run: python -m pip install 'pyarrow>=26' 'shapely>=2.1' pyproj 'geoparquet-validator>=0.3.1' 'geopandas>=1.2' 'pyogrio>=0.11'
+      - name: Run paired tests with real process-exit gates
+        run: python harness/.github/simplification-validation/comparison.py --workspace .
+      - name: Preserve all fresh comparison evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: simplification-comparison-${{ matrix.os }}
+          path: evidence
+          if-no-files-found: error
+
+  full-package:
+    name: Full package ${{ matrix.config.os }} (${{ matrix.config.r }})
+    needs: plan
+    if: needs.plan.outputs.mode == 'validate'
+    runs-on: ${{ matrix.config.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - {os: macos-latest, r: release}
+          - {os: ubuntu-24.04, r: release, rspm: 'https://packagemanager.rstudio.com/cran/__linux__/noble/latest'}
+          - {os: ubuntu-24.04, r: devel, rspm: 'https://packagemanager.rstudio.com/cran/__linux__/noble/latest'}
+          - {os: ubuntu-24.04, r: oldrel, rspm: 'https://packagemanager.rstudio.com/cran/__linux__/noble/latest'}
+    env:
+      RSPM: ${{ matrix.config.rspm }}
+      _R_CHECK_TESTS_NLINES_: 0
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: harness
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.plan.outputs.reference7 }}
+          path: reference7
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.plan.outputs.candidate }}
+          path: candidate
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.plan.outputs.reference8 }}
+          path: reference8
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.plan.outputs.stack }}
+          path: stack
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: ${{ matrix.config.r }}
+      - uses: r-lib/actions/setup-pandoc@v2
+      - id: dependencies
+        uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          working-directory: candidate
+          extra-packages: any::rcmdcheck, any::testthat, any::pkgload, roxygen2@8.1.1, local::.
+          needs: check
+      - name: Verify exact sources and capture package versions
+        shell: bash
+        run: |
+          python3 harness/.github/simplification-validation/source-integrity.py --workspace . --output evidence/source-integrity.json
+          Rscript harness/.github/simplification-validation/environment.R evidence/environment
+      - name: Full reference #7 check in the same Linux environment
+        if: matrix.config.os == 'ubuntu-24.04' && matrix.config.r == 'release'
+        timeout-minutes: 12
+        uses: r-lib/actions/check-r-package@v2
+        with:
+          working-directory: reference7
+          upload-results: 'true'
+          artifact-name: simplification-reference7-${{ matrix.config.os }}-${{ matrix.config.r }}
+      - name: Full candidate package check
+        if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
+        timeout-minutes: 12
+        uses: r-lib/actions/check-r-package@v2
+        with:
+          working-directory: candidate
+          upload-results: 'true'
+          artifact-name: simplification-candidate-${{ matrix.config.os }}-${{ matrix.config.r }}
+      - name: Full reference #8 check in the same Linux environment
+        if: ${{ !cancelled() && steps.dependencies.outcome == 'success' && matrix.config.os == 'ubuntu-24.04' && matrix.config.r == 'release' }}
+        timeout-minutes: 12
+        uses: r-lib/actions/check-r-package@v2
+        with:
+          working-directory: reference8
+          upload-results: 'true'
+          artifact-name: simplification-reference8-${{ matrix.config.os }}-${{ matrix.config.r }}
+      - name: Full V1.1 stack package check
+        if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
+        timeout-minutes: 12
+        uses: r-lib/actions/check-r-package@v2
+        with:
+          working-directory: stack
+          upload-results: 'true'
+          artifact-name: simplification-stack-${{ matrix.config.os }}-${{ matrix.config.r }}
+      - name: Preserve source and dependency identities
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: simplification-full-provenance-${{ matrix.config.os }}-${{ matrix.config.r }}
+          path: evidence
+          if-no-files-found: error
