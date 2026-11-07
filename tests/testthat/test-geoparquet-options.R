@@ -2,6 +2,34 @@
 testthat::skip_on_cran()
 testthat::skip_if_not_installed("duckdb", minimum_version = "2.0.0")
 
+test_that("missing column names are rejected while the literal NA name is retained", {
+  conn <- ddbs_temp_conn()
+  source <- sf::st_sf(
+    id = 17L, geometry = sf::st_sfc(sf::st_point(c(1, 2)), crs = 4326)
+  )
+  output <- tempfile(fileext = ".parquet")
+  on.exit(unlink(output), add = TRUE)
+  names(source)[[1L]] <- NA_character_
+  for (version in c("V1", "V2")) {
+    expect_error(ddbs_write_dataset(
+      source, output, conn = conn, geoparquet_version = version, quiet = TRUE
+    ))
+    expect_false(file.exists(output))
+  }
+
+  names(source)[[1L]] <- "NA"
+  p <- as.character(DBI::dbQuoteString(conn, output))
+  for (version in c("V1", "V2")) {
+    expect_no_error(ddbs_write_dataset(
+      source, output, conn = conn, geoparquet_version = version, quiet = TRUE
+    ))
+    expect_equal(DBI::dbGetQuery(conn, paste0(
+      'SELECT "NA" AS id FROM read_parquet(', p, ")"
+    ))$id, 17L)
+    unlink(output)
+  }
+})
+
 test_that("native BOTH and NONE options retain EPSG and custom CRS", {
   conn <- ddbs_temp_conn()
   custom <- sf::st_crs(

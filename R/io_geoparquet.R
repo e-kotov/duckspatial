@@ -231,12 +231,12 @@ ddbs_write_geoparquet <- function(data, path, conn, overwrite, crs, options,
   override <- if (!is.null(crs)) ddbs_geoparquet_crs(crs) else NULL
   local_sf <- inherits(data, "sf")
   if (local_sf) {
-    # Registration repairs name collisions, which could silently select the
-    # wrong original column. Reject them before registering.
+    # Reject missing or colliding names before registration repairs them;
+    # sql_ident() quotes names without validating them.
     folded_names <- chartr("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz",
                            names(data))
-    if (anyDuplicated(folded_names)) {
-      cli::cli_abort("Column names must be unique ignoring ASCII case for DuckDB GeoParquet export.")
+    if (anyNA(names(data)) || anyDuplicated(folded_names)) {
+      cli::cli_abort("Column names must be non-missing and unique ignoring ASCII case for DuckDB GeoParquet export.")
     }
     primary <- attr(data, "sf_column", exact = TRUE)
     geometry <- names(data)[vapply(data, inherits, logical(1), what = "sfc")]
