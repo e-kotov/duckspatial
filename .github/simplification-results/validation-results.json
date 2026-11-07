@@ -1,0 +1,1495 @@
+{
+  "description": "Final source-specific GeoParquet simplification validation; see RESULTS.md for limits and intermediate failures.",
+  "paired_Linux": {
+    "scope": "Paired targeted package regressions and independent file validation on Linux",
+    "run_url": "https://github.com/e-kotov/duckspatial/actions/runs/42407894394",
+    "artifact": {
+      "run_id": 42407894394,
+      "job_id": 128509482834,
+      "artifact_id": 13587957933,
+      "zip_sha256": "bdeeb7da95f0e0161a67f15ff12a38fdc4386ef997ca4496b0f7887f4d12a3ce"
+    },
+    "source_integrity": {
+      "validation_harness_sha": "2c1b9922a511425cb4936b966642a3f4e31c1111",
+      "preserved_harness": {
+        "source_sha": "233b033d221dc2913d56e2ba431370f50e93e722",
+        "files": {
+          ".github/upstream-validation/interop/generate_geoparquet_fixtures.R": "2db4b31efe7c08ee57d62e933377a84bd74443bf3e3caff1f6ef4c18fea56497",
+          ".github/upstream-validation/interop/run_core_conformance.py": "52f8137331438889b559c7e8774f2b3123f519c19833b6c2ad9ac2da0f986da2",
+          ".github/upstream-validation/interop/validate_geoparquet.py": "f31a7a1271332ecc3f3f38e4285b3b9cd4144783e5f15e5e4546c9609d77d609",
+          ".github/upstream-validation/interop/validate_geoparquet_readers.py": "8cc8280ae37119c8b01f4d798558e29206735efd830ebddd7f7013a1ea7ebb07",
+          ".github/upstream-validation/windows-test-supervisor.py": "6af4fd4d287ae3f15b7a6c34b706c8fb43d8ae4640c84b6490896815e16fe923"
+        }
+      },
+      "sources": {
+        "reference7": "04c34956cb71d2ab6d23072fc9774e9c4d09bc8d",
+        "candidate": "22de905bc18988c4cd0e56eafe6cb6dba50248ae",
+        "reference8": "5bf4d5f988f5b03d02232a9524b006854762ad19",
+        "stack": "cefcf492809831d53794bca40220b9915a706857"
+      },
+      "regression_files": {
+        "candidate": {
+          "tests/testthat/test-geoparquet-crs.R": "15e2c88d36722117d8eaa940c2f891a5eb1e8c14a39ec2197379f8da3f8f0fe3",
+          "tests/testthat/test-geoparquet-dimensions.R": "b01582fa35755d26b0399ce2abfa91d99fb8d0f16324550540201680be9e3398",
+          "tests/testthat/test-geoparquet-edge-cases.R": "d2e414868d3ad866ebbd51251ba490e5a286d9c393f5de8f205a251df826c79e",
+          "tests/testthat/test-geoparquet-versions.R": "558e26ce354bd6cdccdb85f316c6358e301171fd6dc9a7dc1fa4498ac8596747"
+        },
+        "stack": {
+          "tests/testthat/test-geoparquet-crs.R": "15e2c88d36722117d8eaa940c2f891a5eb1e8c14a39ec2197379f8da3f8f0fe3",
+          "tests/testthat/test-geoparquet-dimensions.R": "b01582fa35755d26b0399ce2abfa91d99fb8d0f16324550540201680be9e3398",
+          "tests/testthat/test-geoparquet-edge-cases.R": "d2e414868d3ad866ebbd51251ba490e5a286d9c393f5de8f205a251df826c79e",
+          "tests/testthat/test-geoparquet-v11.R": "c2e1b30d5656659c0d65ce419ec176fa49187ca37008168721e6a147429a5e53",
+          "tests/testthat/test-geoparquet-versions.R": "558e26ce354bd6cdccdb85f316c6358e301171fd6dc9a7dc1fa4498ac8596747"
+        }
+      }
+    },
+    "all_required_stages_passed": true,
+    "same_dependencies_for_all_sources": true,
+    "shared_R_dependencies": {
+      "DBI": "1.3.0",
+      "KernSmooth": "2.23-27",
+      "MASS": "7.3-66",
+      "Matrix": "1.7-6",
+      "R.methodsS3": "1.8.2",
+      "R.oo": "1.27.1",
+      "R6": "2.6.1",
+      "RColorBrewer": "1.1-3",
+      "Rcpp": "1.1.2",
+      "S7": "0.2.2",
+      "abind": "1.4-8",
+      "areal": "0.1.8",
+      "arrow": "26.0.0",
+      "askpass": "1.2.1",
+      "assertthat": "0.2.1",
+      "base": "4.6.2",
+      "base64enc": "0.1-6",
+      "bench": "1.1.4",
+      "bit": "4.6.0",
+      "bit64": "4.8.6",
+      "blob": "1.3.0",
+      "boot": "1.3-32",
+      "brew": "1.0-10",
+      "brio": "1.1.5",
+      "bslib": "0.12.0",
+      "cachem": "1.1.0",
+      "callr": "3.8.0",
+      "class": "7.3-24",
+      "classInt": "0.4-11",
+      "cli": "3.6.6",
+      "clipr": "0.8.1",
+      "cluster": "2.1.8.3",
+      "codetools": "0.2-20",
+      "commonmark": "2.0.0",
+      "compiler": "4.6.2",
+      "covr": "3.6.5",
+      "crayon": "1.5.3",
+      "curl": "8.1.0",
+      "datasets": "4.6.2",
+      "dbplyr": "2.6.0",
+      "desc": "1.4.3",
+      "diffobj": "0.3.9",
+      "digest": "0.6.39",
+      "dplyr": "1.2.1",
+      "duckdb": "2.0.0",
+      "duckdbfs": "0.1.2",
+      "e1071": "1.7-17",
+      "evaluate": "1.0.5",
+      "farver": "2.1.2",
+      "fastmap": "1.2.0",
+      "fontawesome": "0.5.3",
+      "foreign": "0.8-92",
+      "fs": "2.1.0",
+      "generics": "0.1.4",
+      "geoarrow": "0.4.4",
+      "geojsonsf": "2.0.5",
+      "ggplot2": "4.0.3",
+      "glue": "1.8.1",
+      "grDevices": "4.6.2",
+      "graphics": "4.6.2",
+      "grid": "4.6.2",
+      "gtable": "0.3.6",
+      "highr": "0.12",
+      "hms": "1.1.4",
+      "htmltools": "0.5.9",
+      "httpuv": "1.6.17",
+      "httr": "1.4.9",
+      "isoband": "0.3.0",
+      "jquerylib": "0.1.4",
+      "jsonlite": "2.0.0",
+      "knitr": "1.52",
+      "labeling": "0.4.3",
+      "later": "1.4.8",
+      "lattice": "0.23-1",
+      "lifecycle": "1.0.5",
+      "lubridate": "1.9.5",
+      "lwgeom": "0.2-17",
+      "magrittr": "2.0.5",
+      "memoise": "2.0.1",
+      "methods": "4.6.2",
+      "mgcv": "1.9-4",
+      "mime": "0.13",
+      "nanoarrow": "0.9.0",
+      "nlme": "3.1-171",
+      "nnet": "7.3-21",
+      "openssl": "2.5.0",
+      "otel": "0.2.0",
+      "pak": "0.11.1",
+      "parallel": "4.6.2",
+      "patchwork": "1.3.2",
+      "pillar": "1.11.1",
+      "pkgbuild": "1.4.8",
+      "pkgconfig": "2.0.3",
+      "pkgload": "1.5.3",
+      "praise": "1.0.0",
+      "prettyunits": "1.2.0",
+      "processx": "3.9.0",
+      "profmem": "0.7.0",
+      "promises": "1.5.0",
+      "proxy": "0.4-29",
+      "ps": "1.9.3",
+      "purrr": "1.2.2",
+      "quadkeyr": "0.1.0",
+      "quarto": "1.5.1",
+      "rappdirs": "0.3.4",
+      "rcmdcheck": "1.4.0",
+      "rdtools": "0.1.0",
+      "readr": "2.2.0",
+      "rex": "1.2.2",
+      "rlang": "1.3.0",
+      "rmarkdown": "2.32",
+      "roxygen2": "8.1.1",
+      "rpart": "4.1.27",
+      "rprojroot": "2.1.1",
+      "rstudioapi": "0.19.0",
+      "s2": "1.1.13",
+      "sass": "0.4.10",
+      "scales": "1.4.0",
+      "sessioninfo": "1.2.4",
+      "sf": "1.1-3",
+      "shiny": "1.14.0",
+      "sourcetools": "0.1.7-2",
+      "spatial": "7.3-19",
+      "splines": "4.6.2",
+      "stars": "0.7-3",
+      "stats": "4.6.2",
+      "stats4": "4.6.2",
+      "stringi": "1.8.9",
+      "stringr": "1.6.0",
+      "survival": "3.8-12",
+      "sys": "3.4.3",
+      "tcltk": "4.6.2",
+      "terra": "1.9-50",
+      "testthat": "3.3.2",
+      "tibble": "3.3.1",
+      "tidyr": "1.3.2",
+      "tidyselect": "1.2.1",
+      "timechange": "0.4.0",
+      "tinytex": "0.61",
+      "tools": "4.6.2",
+      "tzdb": "0.5.0",
+      "units": "1.0-1",
+      "utf8": "1.2.6",
+      "utils": "4.6.2",
+      "uuid": "1.2-2",
+      "vctrs": "0.7.3",
+      "viridisLite": "0.4.3",
+      "vroom": "1.7.1",
+      "waldo": "0.6.2",
+      "withr": "3.0.3",
+      "wk": "0.9.5",
+      "xfun": "0.62",
+      "xml2": "1.6.0",
+      "xopen": "1.0.1",
+      "xtable": "1.8-8",
+      "yaml": "2.3.12"
+    },
+    "Python_dependencies": {
+      "certifi": "2026.10.23",
+      "geopandas": "1.2.0",
+      "geoparquet-validator": "0.3.1",
+      "numpy": "2.5.4",
+      "packaging": "26.3",
+      "pandas": "3.1.1",
+      "pyarrow": "26.0.1",
+      "pyogrio": "0.13.0",
+      "pyproj": "3.8.0",
+      "python-dateutil": "4.0.0",
+      "shapely": "2.2.0",
+      "tzdata": "2026.6"
+    },
+    "sources": {
+      "reference7": {
+        "source_sha": "04c34956cb71d2ab6d23072fc9774e9c4d09bc8d",
+        "stages": {
+          "install": true,
+          "environment": true,
+          "regression": true,
+          "additional-contract": true,
+          "generate-fixtures": true,
+          "validate_geoparquet.py": true,
+          "validate_geoparquet_readers.py": true,
+          "run_core_conformance.py": true
+        },
+        "regression": {
+          "failed": 0,
+          "error": 0,
+          "warning": 0,
+          "skipped": 0,
+          "passed": 221,
+          "actual_exit_code": 0,
+          "tests_returned": true,
+          "requested_exit_status": 0,
+          "reason": "success"
+        },
+        "additional_contract": {
+          "failed": 0,
+          "error": 0,
+          "warning": 0,
+          "skipped": 0,
+          "passed": 29,
+          "actual_exit_code": 0,
+          "tests_returned": true,
+          "requested_exit_status": 0,
+          "reason": "success"
+        },
+        "core_conformance": {
+          "physical_files": 22,
+          "files_by_version": {
+            "1.0.0": 11,
+            "2.0.0": 11
+          },
+          "core_outcomes": {
+            "pass": 228,
+            "skip": 212
+          },
+          "failed": false,
+          "skip_reasons": {
+            "GeoParquet 1.x has no Parquet crs parameter to compare with the geo crs": 11,
+            "not applicable": 177,
+            "not testable on the file alone": 22,
+            "`geometry`: cannot compare PROJJSON without id (ProjectedCRS \"unknown\") with PROJJSON without id (ProjectedCRS \"unknown\") without a CRS library": 1,
+            "`geometry`: axis order of the CRS cannot be determined; not checked": 1
+          }
+        },
+        "GeoPandas_all_reads_passed": true,
+        "GeoPandas_all_same_version_roundtrips_passed": true,
+        "GDAL_Parquet": "unverified: GDAL 3.12.4 has no Parquet reader",
+        "GeoPandas_read_pass_count": 22
+      },
+      "candidate": {
+        "source_sha": "22de905bc18988c4cd0e56eafe6cb6dba50248ae",
+        "stages": {
+          "install": true,
+          "environment": true,
+          "regression": true,
+          "generate-fixtures": true,
+          "validate_geoparquet.py": true,
+          "validate_geoparquet_readers.py": true,
+          "run_core_conformance.py": true,
+          "generated-help-consistency": true
+        },
+        "regression": {
+          "failed": 0,
+          "error": 0,
+          "warning": 0,
+          "skipped": 0,
+          "passed": 250,
+          "actual_exit_code": 0,
+          "tests_returned": true,
+          "requested_exit_status": 0,
+          "reason": "success"
+        },
+        "core_conformance": {
+          "physical_files": 22,
+          "files_by_version": {
+            "1.0.0": 11,
+            "2.0.0": 11
+          },
+          "core_outcomes": {
+            "pass": 228,
+            "skip": 212
+          },
+          "failed": false,
+          "skip_reasons": {
+            "GeoParquet 1.x has no Parquet crs parameter to compare with the geo crs": 11,
+            "not applicable": 177,
+            "not testable on the file alone": 22,
+            "`geometry`: cannot compare PROJJSON without id (ProjectedCRS \"unknown\") with PROJJSON without id (ProjectedCRS \"unknown\") without a CRS library": 1,
+            "`geometry`: axis order of the CRS cannot be determined; not checked": 1
+          }
+        },
+        "GeoPandas_all_reads_passed": true,
+        "GeoPandas_all_same_version_roundtrips_passed": true,
+        "GDAL_Parquet": "unverified: GDAL 3.12.4 has no Parquet reader",
+        "GeoPandas_read_pass_count": 22
+      },
+      "reference8": {
+        "source_sha": "5bf4d5f988f5b03d02232a9524b006854762ad19",
+        "stages": {
+          "install": true,
+          "environment": true,
+          "regression": true,
+          "additional-contract": true,
+          "generate-fixtures": true,
+          "validate_geoparquet.py": true,
+          "validate_geoparquet_readers.py": true,
+          "run_core_conformance.py": true
+        },
+        "regression": {
+          "failed": 0,
+          "error": 0,
+          "warning": 0,
+          "skipped": 0,
+          "passed": 307,
+          "actual_exit_code": 0,
+          "tests_returned": true,
+          "requested_exit_status": 0,
+          "reason": "success"
+        },
+        "additional_contract": {
+          "failed": 0,
+          "error": 0,
+          "warning": 0,
+          "skipped": 0,
+          "passed": 29,
+          "actual_exit_code": 0,
+          "tests_returned": true,
+          "requested_exit_status": 0,
+          "reason": "success"
+        },
+        "core_conformance": {
+          "physical_files": 34,
+          "files_by_version": {
+            "1.1.0": 12,
+            "1.0.0": 11,
+            "2.0.0": 11
+          },
+          "core_outcomes": {
+            "pass": 346,
+            "skip": 334
+          },
+          "failed": false,
+          "skip_reasons": {
+            "GeoParquet 1.x has no Parquet crs parameter to compare with the geo crs": 23,
+            "not applicable": 274,
+            "not testable on the file alone": 34,
+            "`geometry`: cannot compare PROJJSON without id (ProjectedCRS \"unknown\") with PROJJSON without id (ProjectedCRS \"unknown\") without a CRS library": 1,
+            "`geometry`: axis order of the CRS cannot be determined; not checked": 2
+          }
+        },
+        "GeoPandas_all_reads_passed": true,
+        "GeoPandas_all_same_version_roundtrips_passed": true,
+        "GDAL_Parquet": "unverified: GDAL 3.12.4 has no Parquet reader",
+        "GeoPandas_read_pass_count": 34
+      },
+      "stack": {
+        "source_sha": "cefcf492809831d53794bca40220b9915a706857",
+        "stages": {
+          "install": true,
+          "environment": true,
+          "regression": true,
+          "generate-fixtures": true,
+          "validate_geoparquet.py": true,
+          "validate_geoparquet_readers.py": true,
+          "run_core_conformance.py": true,
+          "generated-help-consistency": true
+        },
+        "regression": {
+          "failed": 0,
+          "error": 0,
+          "warning": 0,
+          "skipped": 0,
+          "passed": 336,
+          "actual_exit_code": 0,
+          "tests_returned": true,
+          "requested_exit_status": 0,
+          "reason": "success"
+        },
+        "core_conformance": {
+          "physical_files": 34,
+          "files_by_version": {
+            "1.1.0": 12,
+            "1.0.0": 11,
+            "2.0.0": 11
+          },
+          "core_outcomes": {
+            "pass": 346,
+            "skip": 334
+          },
+          "failed": false,
+          "skip_reasons": {
+            "GeoParquet 1.x has no Parquet crs parameter to compare with the geo crs": 23,
+            "not applicable": 274,
+            "not testable on the file alone": 34,
+            "`geometry`: cannot compare PROJJSON without id (ProjectedCRS \"unknown\") with PROJJSON without id (ProjectedCRS \"unknown\") without a CRS library": 1,
+            "`geometry`: axis order of the CRS cannot be determined; not checked": 2
+          }
+        },
+        "GeoPandas_all_reads_passed": true,
+        "GeoPandas_all_same_version_roundtrips_passed": true,
+        "GDAL_Parquet": "unverified: GDAL 3.12.4 has no Parquet reader",
+        "GeoPandas_read_pass_count": 34
+      }
+    },
+    "reference_candidate_equivalence": {
+      "candidate": {
+        "equivalent_files": 22,
+        "actual_exit_code": 0,
+        "independent_order_checks_passed": 20
+      },
+      "stack": {
+        "equivalent_files": 34,
+        "actual_exit_code": 0,
+        "independent_order_checks_passed": 30
+      }
+    },
+    "environment": {
+      "R-session-info.txt": "R version 4.6.2 (2026-10-29)\nPlatform: x86_64-pc-linux-gnu\nRunning under: Ubuntu 24.04.5 LTS\n\nMatrix products: default\nBLAS:   /usr/lib/x86_64-linux-gnu/openblas-pthread/libblas.so.3 \nLAPACK: /usr/lib/x86_64-linux-gnu/openblas-pthread/libopenblasp-r0.3.26.so;  LAPACK version 3.12.0\n\nlocale:\n [1] LC_CTYPE=C.UTF-8       LC_NUMERIC=C           LC_TIME=C.UTF-8       \n [4] LC_COLLATE=C.UTF-8     LC_MONETARY=C.UTF-8    LC_MESSAGES=C.UTF-8   \n [7] LC_PAPER=C.UTF-8       LC_NAME=C              LC_ADDRESS=C          \n[10] LC_TELEPHONE=C         LC_MEASUREMENT=C.UTF-8 LC_IDENTIFICATION=C   \n\ntime zone: UTC\ntzcode source: system (glibc)\n\nattached base packages:\n[1] stats     graphics  grDevices utils     datasets  methods   base     \n\nloaded via a namespace (and not attached):\n[1] compiler_4.6.2\n",
+      "DuckDB-version.csv": "\"library_version\",\"source_id\",\"codename\"\n\"v2.0.0\",\"d54cbbe3df\",\"Cyanoptera\"\n",
+      "Spatial-version.csv": "\"extension_name\",\"extension_version\",\"loaded\",\"installed\",\"install_path\",\"install_mode\",\"installed_from\"\n\"spatial\",\"a3dbcd1781\",TRUE,TRUE,\"/tmp/RtmpJgVMGk/duckdb/extensions/v2.0.0/linux_amd64/spatial.duckdb_extension\",\"REPOSITORY\",\"core\"\n"
+    }
+  },
+  "paired_Windows": {
+    "run_id": 42408619025,
+    "run_url": "https://github.com/e-kotov/duckspatial/actions/runs/42408619025",
+    "job_id": 128511707778,
+    "harness_sha": "f66add7eb2037f1fe16d9a098a71524c3f5b03b9",
+    "conclusion": "success",
+    "scope": "Targeted GeoParquet tests only; this is not a full Windows package check.",
+    "source_results": [
+      {
+        "label": "reference7",
+        "source_sha": "04c34956cb71d2ab6d23072fc9774e9c4d09bc8d",
+        "regression": {
+          "failed": 0,
+          "error": 0,
+          "warning": 0,
+          "skipped": 0,
+          "passed": 221,
+          "actual_exit_code": 0,
+          "requested_exit_status": 0,
+          "tests_returned": true,
+          "result": "success"
+        },
+        "additional_contract": {
+          "failed": 0,
+          "error": 0,
+          "warning": 0,
+          "skipped": 0,
+          "passed": 29,
+          "actual_exit_code": 0,
+          "requested_exit_status": 0,
+          "tests_returned": true,
+          "result": "success"
+        }
+      },
+      {
+        "label": "candidate",
+        "source_sha": "22de905bc18988c4cd0e56eafe6cb6dba50248ae",
+        "regression": {
+          "failed": 0,
+          "error": 0,
+          "warning": 0,
+          "skipped": 0,
+          "passed": 250,
+          "actual_exit_code": 0,
+          "requested_exit_status": 0,
+          "tests_returned": true,
+          "result": "success"
+        }
+      },
+      {
+        "label": "reference8",
+        "source_sha": "5bf4d5f988f5b03d02232a9524b006854762ad19",
+        "regression": {
+          "failed": 0,
+          "error": 0,
+          "warning": 0,
+          "skipped": 0,
+          "passed": 307,
+          "actual_exit_code": 0,
+          "requested_exit_status": 0,
+          "tests_returned": true,
+          "result": "success"
+        },
+        "additional_contract": {
+          "failed": 0,
+          "error": 0,
+          "warning": 0,
+          "skipped": 0,
+          "passed": 29,
+          "actual_exit_code": 0,
+          "requested_exit_status": 0,
+          "tests_returned": true,
+          "result": "success"
+        }
+      },
+      {
+        "label": "stack",
+        "source_sha": "cefcf492809831d53794bca40220b9915a706857",
+        "regression": {
+          "failed": 0,
+          "error": 0,
+          "warning": 0,
+          "skipped": 0,
+          "passed": 336,
+          "actual_exit_code": 0,
+          "requested_exit_status": 0,
+          "tests_returned": true,
+          "result": "success"
+        }
+      }
+    ],
+    "all_six_R_processes_exited_zero": true,
+    "all_suites_have_zero_failures_errors_warnings_skips": true,
+    "same_dependency_versions_and_library_paths_excluding_tested_package": true,
+    "unchanged_original_regression_files": {
+      "candidate": 4,
+      "stack": 5
+    },
+    "environment": {
+      "R": "R version 4.6.2 (2026-10-29 ucrt)",
+      "platform": "Platform: x86_64-w64-mingw32/x64",
+      "OS_reported_by_R": "Running under: Windows Server 2022 x64 (build 26100)",
+      "DuckDB_native": {
+        "library_version": "v2.0.0",
+        "source_id": "d54cbbe3df",
+        "codename": "Cyanoptera"
+      },
+      "Spatial_extension_version": "a3dbcd1781",
+      "R_packages": {
+        "duckdb": "2.0.0",
+        "DBI": "1.3.0",
+        "sf": "1.1-3",
+        "dbplyr": "2.6.0",
+        "dplyr": "1.2.1",
+        "arrow": "26.0.0",
+        "geoarrow": "0.4.4",
+        "jsonlite": "2.0.0",
+        "testthat": "3.3.2",
+        "pkgload": "1.5.3",
+        "roxygen2": "8.1.1"
+      },
+      "Python": "3.12.10"
+    },
+    "artifact": {
+      "id": 13589100030,
+      "name": "simplification-comparison-windows-latest",
+      "sha256": "a87c0d481b7aeb17934ca2fdd9005d9c37b81fb9403ecb0bcf0713efc0caada4",
+      "matches_GitHub_archive_digest": true,
+      "archive_bytes": 571685
+    },
+    "independent_interoperability_run_on_Windows": false,
+    "shared_R_dependencies": {
+      "DBI": "1.3.0",
+      "KernSmooth": "2.23-27",
+      "MASS": "7.3-66",
+      "Matrix": "1.7-6",
+      "R.methodsS3": "1.8.2",
+      "R.oo": "1.27.1",
+      "R6": "2.6.1",
+      "RColorBrewer": "1.1-3",
+      "Rcpp": "1.1.2",
+      "S7": "0.2.2",
+      "abind": "1.4-8",
+      "areal": "0.1.8",
+      "arrow": "26.0.0",
+      "askpass": "1.2.1",
+      "assertthat": "0.2.1",
+      "base": "4.6.2",
+      "base64enc": "0.1-6",
+      "bench": "1.1.4",
+      "bit": "4.6.0",
+      "bit64": "4.8.6",
+      "blob": "1.3.0",
+      "boot": "1.3-32",
+      "brew": "1.0-10",
+      "brio": "1.1.5",
+      "bslib": "0.12.0",
+      "cachem": "1.1.0",
+      "callr": "3.8.0",
+      "class": "7.3-24",
+      "classInt": "0.4-11",
+      "cli": "3.6.6",
+      "clipr": "0.8.1",
+      "cluster": "2.1.8.3",
+      "codetools": "0.2-20",
+      "commonmark": "2.0.0",
+      "compiler": "4.6.2",
+      "covr": "3.6.5",
+      "crayon": "1.5.3",
+      "curl": "8.1.0",
+      "datasets": "4.6.2",
+      "dbplyr": "2.6.0",
+      "desc": "1.4.3",
+      "diffobj": "0.3.9",
+      "digest": "0.6.39",
+      "dplyr": "1.2.1",
+      "duckdb": "2.0.0",
+      "duckdbfs": "0.1.2",
+      "e1071": "1.7-17",
+      "evaluate": "1.0.5",
+      "farver": "2.1.2",
+      "fastmap": "1.2.0",
+      "fontawesome": "0.5.3",
+      "foreign": "0.8-92",
+      "fs": "2.1.0",
+      "generics": "0.1.4",
+      "geoarrow": "0.4.4",
+      "geojsonsf": "2.0.5",
+      "ggplot2": "4.0.3",
+      "glue": "1.8.1",
+      "grDevices": "4.6.2",
+      "graphics": "4.6.2",
+      "grid": "4.6.2",
+      "gtable": "0.3.6",
+      "highr": "0.12",
+      "hms": "1.1.4",
+      "htmltools": "0.5.9",
+      "httpuv": "1.6.17",
+      "httr": "1.4.9",
+      "isoband": "0.3.0",
+      "jquerylib": "0.1.4",
+      "jsonlite": "2.0.0",
+      "knitr": "1.52",
+      "labeling": "0.4.3",
+      "later": "1.4.8",
+      "lattice": "0.23-1",
+      "lifecycle": "1.0.5",
+      "lubridate": "1.9.5",
+      "lwgeom": "0.2-17",
+      "magrittr": "2.0.5",
+      "memoise": "2.0.1",
+      "methods": "4.6.2",
+      "mgcv": "1.9-4",
+      "mime": "0.13",
+      "nanoarrow": "0.9.0",
+      "nlme": "3.1-171",
+      "nnet": "7.3-21",
+      "openssl": "2.5.0",
+      "otel": "0.2.0",
+      "pak": "0.11.1",
+      "parallel": "4.6.2",
+      "patchwork": "1.3.2",
+      "pillar": "1.11.1",
+      "pkgbuild": "1.4.8",
+      "pkgconfig": "2.0.3",
+      "pkgload": "1.5.3",
+      "praise": "1.0.0",
+      "prettyunits": "1.2.0",
+      "processx": "3.9.0",
+      "profmem": "0.7.0",
+      "promises": "1.5.0",
+      "proxy": "0.4-29",
+      "ps": "1.9.3",
+      "purrr": "1.2.2",
+      "quadkeyr": "0.1.0",
+      "quarto": "1.5.1",
+      "rappdirs": "0.3.4",
+      "rcmdcheck": "1.4.0",
+      "rdtools": "0.1.0",
+      "readr": "2.2.0",
+      "rex": "1.2.2",
+      "rlang": "1.3.0",
+      "rmarkdown": "2.32",
+      "roxygen2": "8.1.1",
+      "rpart": "4.1.27",
+      "rprojroot": "2.1.1",
+      "rstudioapi": "0.19.0",
+      "s2": "1.1.13",
+      "sass": "0.4.10",
+      "scales": "1.4.0",
+      "sessioninfo": "1.2.4",
+      "sf": "1.1-3",
+      "shiny": "1.14.0",
+      "sourcetools": "0.1.7-2",
+      "spatial": "7.3-19",
+      "splines": "4.6.2",
+      "stars": "0.7-3",
+      "stats": "4.6.2",
+      "stats4": "4.6.2",
+      "stringi": "1.8.9",
+      "stringr": "1.6.0",
+      "survival": "3.8-12",
+      "sys": "3.4.3",
+      "tcltk": "4.6.2",
+      "terra": "1.9-50",
+      "testthat": "3.3.2",
+      "tibble": "3.3.1",
+      "tidyr": "1.3.2",
+      "tidyselect": "1.2.1",
+      "timechange": "0.4.0",
+      "tinytex": "0.61",
+      "tools": "4.6.2",
+      "translations": "4.6.2",
+      "tzdb": "0.5.0",
+      "units": "1.0-1",
+      "utf8": "1.2.6",
+      "utils": "4.6.2",
+      "uuid": "1.2-2",
+      "vctrs": "0.7.3",
+      "viridisLite": "0.4.3",
+      "vroom": "1.7.1",
+      "waldo": "0.6.2",
+      "withr": "3.0.3",
+      "wk": "0.9.5",
+      "xfun": "0.62",
+      "xml2": "1.6.0",
+      "xopen": "1.0.1",
+      "xtable": "1.8-8",
+      "yaml": "2.3.12"
+    }
+  },
+  "full_package_checks": {
+    "run_id": 42407894394,
+    "run_url": "https://github.com/e-kotov/duckspatial/actions/runs/42407894394",
+    "harness_sha": "2c1b9922a511425cb4936b966642a3f4e31c1111",
+    "sources": {
+      "reference7": "04c34956cb71d2ab6d23072fc9774e9c4d09bc8d",
+      "candidate": "22de905bc18988c4cd0e56eafe6cb6dba50248ae",
+      "reference8": "5bf4d5f988f5b03d02232a9524b006854762ad19",
+      "stack": "cefcf492809831d53794bca40220b9915a706857"
+    },
+    "complete": true,
+    "scope": "Full package checks on Linux release/devel/oldrel and macOS release; both frozen references checked in the same Linux release job. No full Windows check in this run.",
+    "check_arguments": "--no-manual --as-cran",
+    "jobs": [
+      {
+        "id": 128509482853,
+        "name": "Full package macos-latest (release)",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/e-kotov/duckspatial/actions/runs/42407894394/job/128509482853",
+        "started_at": "2026-11-07T19:47:28Z",
+        "completed_at": "2026-11-07T20:03:04Z",
+        "steps": [
+          {
+            "name": "Verify exact sources and capture package versions",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-07T19:49:55Z",
+            "completed_at": "2026-11-07T19:49:59Z"
+          },
+          {
+            "name": "Full reference #7 check in the same Linux environment",
+            "status": "completed",
+            "conclusion": "skipped",
+            "started_at": "2026-11-07T19:49:59Z",
+            "completed_at": "2026-11-07T19:49:59Z"
+          },
+          {
+            "name": "Full candidate package check",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-07T19:49:59Z",
+            "completed_at": "2026-11-07T19:56:20Z"
+          },
+          {
+            "name": "Full reference #8 check in the same Linux environment",
+            "status": "completed",
+            "conclusion": "skipped",
+            "started_at": "2026-11-07T19:56:20Z",
+            "completed_at": "2026-11-07T19:56:20Z"
+          },
+          {
+            "name": "Full V1.1 stack package check",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-07T19:56:20Z",
+            "completed_at": "2026-11-07T20:02:54Z"
+          }
+        ]
+      },
+      {
+        "id": 128509482880,
+        "name": "Full package ubuntu-24.04 (devel)",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/e-kotov/duckspatial/actions/runs/42407894394/job/128509482880",
+        "started_at": "2026-11-07T19:47:28Z",
+        "completed_at": "2026-11-07T19:59:29Z",
+        "steps": [
+          {
+            "name": "Verify exact sources and capture package versions",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-07T19:49:57Z",
+            "completed_at": "2026-11-07T19:49:59Z"
+          },
+          {
+            "name": "Full reference #7 check in the same Linux environment",
+            "status": "completed",
+            "conclusion": "skipped",
+            "started_at": "2026-11-07T19:49:59Z",
+            "completed_at": "2026-11-07T19:49:59Z"
+          },
+          {
+            "name": "Full candidate package check",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-07T19:49:59Z",
+            "completed_at": "2026-11-07T19:54:42Z"
+          },
+          {
+            "name": "Full reference #8 check in the same Linux environment",
+            "status": "completed",
+            "conclusion": "skipped",
+            "started_at": "2026-11-07T19:54:42Z",
+            "completed_at": "2026-11-07T19:54:42Z"
+          },
+          {
+            "name": "Full V1.1 stack package check",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-07T19:54:42Z",
+            "completed_at": "2026-11-07T19:59:19Z"
+          }
+        ]
+      },
+      {
+        "id": 128509482884,
+        "name": "Full package ubuntu-24.04 (release)",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/e-kotov/duckspatial/actions/runs/42407894394/job/128509482884",
+        "started_at": "2026-11-07T19:47:28Z",
+        "completed_at": "2026-11-07T20:16:11Z",
+        "steps": [
+          {
+            "name": "Verify exact sources and capture package versions",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-07T19:51:14Z",
+            "completed_at": "2026-11-07T19:51:16Z"
+          },
+          {
+            "name": "Full reference #7 check in the same Linux environment",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-07T19:51:16Z",
+            "completed_at": "2026-11-07T19:57:24Z"
+          },
+          {
+            "name": "Full candidate package check",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-07T19:57:24Z",
+            "completed_at": "2026-11-07T20:03:35Z"
+          },
+          {
+            "name": "Full reference #8 check in the same Linux environment",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-07T20:03:35Z",
+            "completed_at": "2026-11-07T20:09:48Z"
+          },
+          {
+            "name": "Full V1.1 stack package check",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-07T20:09:48Z",
+            "completed_at": "2026-11-07T20:16:05Z"
+          }
+        ]
+      },
+      {
+        "id": 128509482894,
+        "name": "Full package ubuntu-24.04 (oldrel)",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/e-kotov/duckspatial/actions/runs/42407894394/job/128509482894",
+        "started_at": "2026-11-07T19:47:29Z",
+        "completed_at": "2026-11-07T20:04:18Z",
+        "steps": [
+          {
+            "name": "Verify exact sources and capture package versions",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-07T19:49:29Z",
+            "completed_at": "2026-11-07T19:49:32Z"
+          },
+          {
+            "name": "Full reference #7 check in the same Linux environment",
+            "status": "completed",
+            "conclusion": "skipped",
+            "started_at": "2026-11-07T19:49:32Z",
+            "completed_at": "2026-11-07T19:49:32Z"
+          },
+          {
+            "name": "Full candidate package check",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-07T19:49:32Z",
+            "completed_at": "2026-11-07T19:56:49Z"
+          },
+          {
+            "name": "Full reference #8 check in the same Linux environment",
+            "status": "completed",
+            "conclusion": "skipped",
+            "started_at": "2026-11-07T19:56:49Z",
+            "completed_at": "2026-11-07T19:56:49Z"
+          },
+          {
+            "name": "Full V1.1 stack package check",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-07T19:56:49Z",
+            "completed_at": "2026-11-07T20:04:11Z"
+          }
+        ]
+      }
+    ],
+    "checks": [
+      {
+        "name": "simplification-candidate-macos-latest-release",
+        "source_label": "candidate",
+        "source_sha": "22de905bc18988c4cd0e56eafe6cb6dba50248ae",
+        "job_id": 128509482853,
+        "artifact_id": 13588462447,
+        "artifact_sha256": "2c66d4e512ef27463418b427e87b8a1f32ee6b8729e05d33586efc85ba3e327d",
+        "check_status": "OK",
+        "environment": [
+          "* using R version 4.6.2 (2026-10-29)",
+          "* using platform: aarch64-apple-darwin23",
+          "* running under: macOS Tahoe 26.7.2",
+          "* using options \u2018--no-manual --as-cran\u2019"
+        ],
+        "testthat": {
+          "fail": 0,
+          "warn": 148,
+          "skip": 2,
+          "pass": 3555
+        },
+        "packaged_source_files_sha256": {
+          "R/io_geoparquet.R": "9f1becf2b13759adda2f73dac51565cd28c82a9375dd44b21391a08a04df2948",
+          "R/io_write_dataset.R": "bbc480611cdf05fc5a2a385b6dc7c3d51be6be9af68a00aea1d9af8168e7191b",
+          "man/ddbs_write_dataset.Rd": "e577d9b22d2931f190a39707f8e7e551f0added4561ab65e2342a311eca867de",
+          "tests/testthat/test-geoparquet-crs.R": "15e2c88d36722117d8eaa940c2f891a5eb1e8c14a39ec2197379f8da3f8f0fe3",
+          "tests/testthat/test-geoparquet-dimensions.R": "b01582fa35755d26b0399ce2abfa91d99fb8d0f16324550540201680be9e3398",
+          "tests/testthat/test-geoparquet-edge-cases.R": "d2e414868d3ad866ebbd51251ba490e5a286d9c393f5de8f205a251df826c79e",
+          "tests/testthat/test-geoparquet-options.R": "1671067abc00e7ef1511a8aa50eac45842dd22e7f229399fe7087c8ebdc54cdc",
+          "tests/testthat/test-geoparquet-versions.R": "558e26ce354bd6cdccdb85f316c6358e301171fd6dc9a7dc1fa4498ac8596747"
+        },
+        "warning_messages_and_locations_identical_to_reference7": true,
+        "skip_reasons_identical_to_reference7": true,
+        "warning_multiset_sha256": "9a188e491aa8d8b56f1ebf4a07b0fe3b86509d6351767b6b0aba80ee92261c58"
+      },
+      {
+        "name": "simplification-candidate-ubuntu-24.04-devel",
+        "source_label": "candidate",
+        "source_sha": "22de905bc18988c4cd0e56eafe6cb6dba50248ae",
+        "job_id": 128509482880,
+        "artifact_id": 13588770520,
+        "artifact_sha256": "f310727b18170f9b6740a87097a5ea2700652f2fc4e0c91552df425c79556b55",
+        "check_status": "OK",
+        "environment": [
+          "* using R Under development (unstable) (2026-11-06 r90845)",
+          "* using platform: x86_64-pc-linux-gnu",
+          "* running under: Ubuntu 24.04.5 LTS",
+          "* using options \u2018--no-manual --as-cran\u2019"
+        ],
+        "testthat": {
+          "fail": 0,
+          "warn": 148,
+          "skip": 2,
+          "pass": 3555
+        },
+        "packaged_source_files_sha256": {
+          "R/io_geoparquet.R": "9f1becf2b13759adda2f73dac51565cd28c82a9375dd44b21391a08a04df2948",
+          "R/io_write_dataset.R": "bbc480611cdf05fc5a2a385b6dc7c3d51be6be9af68a00aea1d9af8168e7191b",
+          "man/ddbs_write_dataset.Rd": "e577d9b22d2931f190a39707f8e7e551f0added4561ab65e2342a311eca867de",
+          "tests/testthat/test-geoparquet-crs.R": "15e2c88d36722117d8eaa940c2f891a5eb1e8c14a39ec2197379f8da3f8f0fe3",
+          "tests/testthat/test-geoparquet-dimensions.R": "b01582fa35755d26b0399ce2abfa91d99fb8d0f16324550540201680be9e3398",
+          "tests/testthat/test-geoparquet-edge-cases.R": "d2e414868d3ad866ebbd51251ba490e5a286d9c393f5de8f205a251df826c79e",
+          "tests/testthat/test-geoparquet-options.R": "1671067abc00e7ef1511a8aa50eac45842dd22e7f229399fe7087c8ebdc54cdc",
+          "tests/testthat/test-geoparquet-versions.R": "558e26ce354bd6cdccdb85f316c6358e301171fd6dc9a7dc1fa4498ac8596747"
+        },
+        "warning_messages_and_locations_identical_to_reference7": true,
+        "skip_reasons_identical_to_reference7": true,
+        "warning_multiset_sha256": "9a188e491aa8d8b56f1ebf4a07b0fe3b86509d6351767b6b0aba80ee92261c58"
+      },
+      {
+        "name": "simplification-candidate-ubuntu-24.04-oldrel",
+        "source_label": "candidate",
+        "source_sha": "22de905bc18988c4cd0e56eafe6cb6dba50248ae",
+        "job_id": 128509482894,
+        "artifact_id": 13588507480,
+        "artifact_sha256": "15b45939024a92940436d5a46b0518f8ebeb51ad24bae31c538c5f4758b3f53c",
+        "check_status": "OK",
+        "environment": [
+          "* using R version 4.5.3 (2026-03-11)",
+          "* using platform: x86_64-pc-linux-gnu",
+          "* running under: Ubuntu 24.04.5 LTS",
+          "* using options \u2018--no-manual --as-cran\u2019"
+        ],
+        "testthat": {
+          "fail": 0,
+          "warn": 148,
+          "skip": 2,
+          "pass": 3555
+        },
+        "packaged_source_files_sha256": {
+          "R/io_geoparquet.R": "9f1becf2b13759adda2f73dac51565cd28c82a9375dd44b21391a08a04df2948",
+          "R/io_write_dataset.R": "bbc480611cdf05fc5a2a385b6dc7c3d51be6be9af68a00aea1d9af8168e7191b",
+          "man/ddbs_write_dataset.Rd": "e577d9b22d2931f190a39707f8e7e551f0added4561ab65e2342a311eca867de",
+          "tests/testthat/test-geoparquet-crs.R": "15e2c88d36722117d8eaa940c2f891a5eb1e8c14a39ec2197379f8da3f8f0fe3",
+          "tests/testthat/test-geoparquet-dimensions.R": "b01582fa35755d26b0399ce2abfa91d99fb8d0f16324550540201680be9e3398",
+          "tests/testthat/test-geoparquet-edge-cases.R": "d2e414868d3ad866ebbd51251ba490e5a286d9c393f5de8f205a251df826c79e",
+          "tests/testthat/test-geoparquet-versions.R": "558e26ce354bd6cdccdb85f316c6358e301171fd6dc9a7dc1fa4498ac8596747",
+          "tests/testthat/test-geoparquet-options.R": "1671067abc00e7ef1511a8aa50eac45842dd22e7f229399fe7087c8ebdc54cdc"
+        },
+        "warning_messages_and_locations_identical_to_reference7": true,
+        "skip_reasons_identical_to_reference7": true,
+        "warning_multiset_sha256": "9a188e491aa8d8b56f1ebf4a07b0fe3b86509d6351767b6b0aba80ee92261c58"
+      },
+      {
+        "name": "simplification-candidate-ubuntu-24.04-release",
+        "source_label": "candidate",
+        "source_sha": "22de905bc18988c4cd0e56eafe6cb6dba50248ae",
+        "job_id": 128509482884,
+        "artifact_id": 13588568187,
+        "artifact_sha256": "4c47614634b95ec18645a779f76d25d1fe2336be62629ddf6b32a2c5fbe8b368",
+        "check_status": "OK",
+        "environment": [
+          "* using R version 4.6.2 (2026-10-29)",
+          "* using platform: x86_64-pc-linux-gnu",
+          "* running under: Ubuntu 24.04.5 LTS",
+          "* using options \u2018--no-manual --as-cran\u2019"
+        ],
+        "testthat": {
+          "fail": 0,
+          "warn": 148,
+          "skip": 2,
+          "pass": 3555
+        },
+        "packaged_source_files_sha256": {
+          "R/io_geoparquet.R": "9f1becf2b13759adda2f73dac51565cd28c82a9375dd44b21391a08a04df2948",
+          "R/io_write_dataset.R": "bbc480611cdf05fc5a2a385b6dc7c3d51be6be9af68a00aea1d9af8168e7191b",
+          "man/ddbs_write_dataset.Rd": "e577d9b22d2931f190a39707f8e7e551f0added4561ab65e2342a311eca867de",
+          "tests/testthat/test-geoparquet-dimensions.R": "b01582fa35755d26b0399ce2abfa91d99fb8d0f16324550540201680be9e3398",
+          "tests/testthat/test-geoparquet-crs.R": "15e2c88d36722117d8eaa940c2f891a5eb1e8c14a39ec2197379f8da3f8f0fe3",
+          "tests/testthat/test-geoparquet-edge-cases.R": "d2e414868d3ad866ebbd51251ba490e5a286d9c393f5de8f205a251df826c79e",
+          "tests/testthat/test-geoparquet-options.R": "1671067abc00e7ef1511a8aa50eac45842dd22e7f229399fe7087c8ebdc54cdc",
+          "tests/testthat/test-geoparquet-versions.R": "558e26ce354bd6cdccdb85f316c6358e301171fd6dc9a7dc1fa4498ac8596747"
+        },
+        "warning_messages_and_locations_identical_to_reference7": true,
+        "skip_reasons_identical_to_reference7": true,
+        "warning_multiset_sha256": "9a188e491aa8d8b56f1ebf4a07b0fe3b86509d6351767b6b0aba80ee92261c58"
+      },
+      {
+        "name": "simplification-reference7-ubuntu-24.04-release",
+        "source_label": "reference7",
+        "source_sha": "04c34956cb71d2ab6d23072fc9774e9c4d09bc8d",
+        "job_id": 128509482884,
+        "artifact_id": 13588721542,
+        "artifact_sha256": "780749f4895b8b719765e808fc0ded571fb54921ba2fb5a2705374282be13294",
+        "check_status": "OK",
+        "environment": [
+          "* using R version 4.6.2 (2026-10-29)",
+          "* using platform: x86_64-pc-linux-gnu",
+          "* running under: Ubuntu 24.04.5 LTS",
+          "* using options \u2018--no-manual --as-cran\u2019"
+        ],
+        "testthat": {
+          "fail": 0,
+          "warn": 148,
+          "skip": 2,
+          "pass": 3526
+        },
+        "packaged_source_files_sha256": {
+          "R/io_geoparquet.R": "eaeb8b5b9cf57c9a3da13dd3995924cf286e8805f2d942655c880848a626a3bb",
+          "R/io_write_dataset.R": "ca6318e7f94ac05d32417f5d0eb9687979f70d810fcc09de26901a3fd9a0d1e9",
+          "man/ddbs_write_dataset.Rd": "e6892ae469b49e77fcc7b4c2d1663ca18a4377754cab2a6bb7e4d97b4afa9410",
+          "tests/testthat/test-geoparquet-crs.R": "15e2c88d36722117d8eaa940c2f891a5eb1e8c14a39ec2197379f8da3f8f0fe3",
+          "tests/testthat/test-geoparquet-dimensions.R": "b01582fa35755d26b0399ce2abfa91d99fb8d0f16324550540201680be9e3398",
+          "tests/testthat/test-geoparquet-edge-cases.R": "d2e414868d3ad866ebbd51251ba490e5a286d9c393f5de8f205a251df826c79e",
+          "tests/testthat/test-geoparquet-versions.R": "558e26ce354bd6cdccdb85f316c6358e301171fd6dc9a7dc1fa4498ac8596747"
+        },
+        "warning_messages_and_locations_identical_to_reference7": true,
+        "skip_reasons_identical_to_reference7": true,
+        "warning_multiset_sha256": "9a188e491aa8d8b56f1ebf4a07b0fe3b86509d6351767b6b0aba80ee92261c58"
+      },
+      {
+        "name": "simplification-reference8-ubuntu-24.04-release",
+        "source_label": "reference8",
+        "source_sha": "5bf4d5f988f5b03d02232a9524b006854762ad19",
+        "job_id": 128509482884,
+        "artifact_id": 13588753415,
+        "artifact_sha256": "72d74dba7388e328ac1cb2f9d1d76776be180a76d6fa581ebf456bd56f04ec2d",
+        "check_status": "OK",
+        "environment": [
+          "* using R version 4.6.2 (2026-10-29)",
+          "* using platform: x86_64-pc-linux-gnu",
+          "* running under: Ubuntu 24.04.5 LTS",
+          "* using options \u2018--no-manual --as-cran\u2019"
+        ],
+        "testthat": {
+          "fail": 0,
+          "warn": 148,
+          "skip": 2,
+          "pass": 3612
+        },
+        "packaged_source_files_sha256": {
+          "R/io_geoparquet.R": "3a81f2b16082f1ef3efc6d61509e8fe8cfb3f7124e72f6dcb4d0316ac417fc3f",
+          "R/io_write_dataset.R": "c1ec1889906269b1ffc89f40a9eeac1198edae50d076e6f62eee69b6b1fbf416",
+          "man/ddbs_write_dataset.Rd": "9566822585d65e0c945b74bf560e4788f3e1644239285c29545af1b6edf61ea4",
+          "tests/testthat/test-geoparquet-crs.R": "15e2c88d36722117d8eaa940c2f891a5eb1e8c14a39ec2197379f8da3f8f0fe3",
+          "tests/testthat/test-geoparquet-dimensions.R": "b01582fa35755d26b0399ce2abfa91d99fb8d0f16324550540201680be9e3398",
+          "tests/testthat/test-geoparquet-edge-cases.R": "d2e414868d3ad866ebbd51251ba490e5a286d9c393f5de8f205a251df826c79e",
+          "tests/testthat/test-geoparquet-v11.R": "c2e1b30d5656659c0d65ce419ec176fa49187ca37008168721e6a147429a5e53",
+          "tests/testthat/test-geoparquet-versions.R": "558e26ce354bd6cdccdb85f316c6358e301171fd6dc9a7dc1fa4498ac8596747"
+        },
+        "warning_messages_and_locations_identical_to_reference7": true,
+        "skip_reasons_identical_to_reference7": true,
+        "warning_multiset_sha256": "9a188e491aa8d8b56f1ebf4a07b0fe3b86509d6351767b6b0aba80ee92261c58"
+      },
+      {
+        "name": "simplification-stack-macos-latest-release",
+        "source_label": "stack",
+        "source_sha": "cefcf492809831d53794bca40220b9915a706857",
+        "job_id": 128509482853,
+        "artifact_id": 13588104592,
+        "artifact_sha256": "e0163279ec193dc0ca283e9013ba53829d438d896ee85d72ac7ea4dc14aff573",
+        "check_status": "OK",
+        "environment": [
+          "* using R version 4.6.2 (2026-10-29)",
+          "* using platform: aarch64-apple-darwin23",
+          "* running under: macOS Tahoe 26.7.2",
+          "* using options \u2018--no-manual --as-cran\u2019"
+        ],
+        "testthat": {
+          "fail": 0,
+          "warn": 148,
+          "skip": 2,
+          "pass": 3641
+        },
+        "packaged_source_files_sha256": {
+          "R/io_geoparquet.R": "c7d5ad7489eb716ceb29b4e167fc17a52231ee53d2705c22dd06d8a4fbd95b57",
+          "R/io_write_dataset.R": "ecdbc5f9ef90f6388c2f26f126c9569d578b45b36bf4d4e806af219447491fc0",
+          "man/ddbs_write_dataset.Rd": "03a691a13a6cfd05710ecff1096e668633426d77579aa8aeb6378d3a531292aa",
+          "tests/testthat/test-geoparquet-crs.R": "15e2c88d36722117d8eaa940c2f891a5eb1e8c14a39ec2197379f8da3f8f0fe3",
+          "tests/testthat/test-geoparquet-dimensions.R": "b01582fa35755d26b0399ce2abfa91d99fb8d0f16324550540201680be9e3398",
+          "tests/testthat/test-geoparquet-edge-cases.R": "d2e414868d3ad866ebbd51251ba490e5a286d9c393f5de8f205a251df826c79e",
+          "tests/testthat/test-geoparquet-options.R": "1671067abc00e7ef1511a8aa50eac45842dd22e7f229399fe7087c8ebdc54cdc",
+          "tests/testthat/test-geoparquet-versions.R": "558e26ce354bd6cdccdb85f316c6358e301171fd6dc9a7dc1fa4498ac8596747",
+          "tests/testthat/test-geoparquet-v11.R": "c2e1b30d5656659c0d65ce419ec176fa49187ca37008168721e6a147429a5e53"
+        },
+        "warning_messages_and_locations_identical_to_reference7": true,
+        "skip_reasons_identical_to_reference7": true,
+        "warning_multiset_sha256": "9a188e491aa8d8b56f1ebf4a07b0fe3b86509d6351767b6b0aba80ee92261c58"
+      },
+      {
+        "name": "simplification-stack-ubuntu-24.04-devel",
+        "source_label": "stack",
+        "source_sha": "cefcf492809831d53794bca40220b9915a706857",
+        "job_id": 128509482880,
+        "artifact_id": 13587878824,
+        "artifact_sha256": "99ca62bbc58cc675954c055d7ae8f3b8d13bbc0504329410f7889306b49f151e",
+        "check_status": "OK",
+        "environment": [
+          "* using R Under development (unstable) (2026-11-06 r90845)",
+          "* using platform: x86_64-pc-linux-gnu",
+          "* running under: Ubuntu 24.04.5 LTS",
+          "* using options \u2018--no-manual --as-cran\u2019"
+        ],
+        "testthat": {
+          "fail": 0,
+          "warn": 148,
+          "skip": 2,
+          "pass": 3641
+        },
+        "packaged_source_files_sha256": {
+          "R/io_geoparquet.R": "c7d5ad7489eb716ceb29b4e167fc17a52231ee53d2705c22dd06d8a4fbd95b57",
+          "R/io_write_dataset.R": "ecdbc5f9ef90f6388c2f26f126c9569d578b45b36bf4d4e806af219447491fc0",
+          "man/ddbs_write_dataset.Rd": "03a691a13a6cfd05710ecff1096e668633426d77579aa8aeb6378d3a531292aa",
+          "tests/testthat/test-geoparquet-crs.R": "15e2c88d36722117d8eaa940c2f891a5eb1e8c14a39ec2197379f8da3f8f0fe3",
+          "tests/testthat/test-geoparquet-dimensions.R": "b01582fa35755d26b0399ce2abfa91d99fb8d0f16324550540201680be9e3398",
+          "tests/testthat/test-geoparquet-options.R": "1671067abc00e7ef1511a8aa50eac45842dd22e7f229399fe7087c8ebdc54cdc",
+          "tests/testthat/test-geoparquet-edge-cases.R": "d2e414868d3ad866ebbd51251ba490e5a286d9c393f5de8f205a251df826c79e",
+          "tests/testthat/test-geoparquet-v11.R": "c2e1b30d5656659c0d65ce419ec176fa49187ca37008168721e6a147429a5e53",
+          "tests/testthat/test-geoparquet-versions.R": "558e26ce354bd6cdccdb85f316c6358e301171fd6dc9a7dc1fa4498ac8596747"
+        },
+        "warning_messages_and_locations_identical_to_reference7": true,
+        "skip_reasons_identical_to_reference7": true,
+        "warning_multiset_sha256": "9a188e491aa8d8b56f1ebf4a07b0fe3b86509d6351767b6b0aba80ee92261c58"
+      },
+      {
+        "name": "simplification-stack-ubuntu-24.04-oldrel",
+        "source_label": "stack",
+        "source_sha": "cefcf492809831d53794bca40220b9915a706857",
+        "job_id": 128509482894,
+        "artifact_id": 13588274199,
+        "artifact_sha256": "877537632f72f51be18043b62e521bdba1fec43f29164905f1a03cf73fb04479",
+        "check_status": "OK",
+        "environment": [
+          "* using R version 4.5.3 (2026-03-11)",
+          "* using platform: x86_64-pc-linux-gnu",
+          "* running under: Ubuntu 24.04.5 LTS",
+          "* using options \u2018--no-manual --as-cran\u2019"
+        ],
+        "testthat": {
+          "fail": 0,
+          "warn": 148,
+          "skip": 2,
+          "pass": 3641
+        },
+        "packaged_source_files_sha256": {
+          "R/io_geoparquet.R": "c7d5ad7489eb716ceb29b4e167fc17a52231ee53d2705c22dd06d8a4fbd95b57",
+          "R/io_write_dataset.R": "ecdbc5f9ef90f6388c2f26f126c9569d578b45b36bf4d4e806af219447491fc0",
+          "man/ddbs_write_dataset.Rd": "03a691a13a6cfd05710ecff1096e668633426d77579aa8aeb6378d3a531292aa",
+          "tests/testthat/test-geoparquet-dimensions.R": "b01582fa35755d26b0399ce2abfa91d99fb8d0f16324550540201680be9e3398",
+          "tests/testthat/test-geoparquet-crs.R": "15e2c88d36722117d8eaa940c2f891a5eb1e8c14a39ec2197379f8da3f8f0fe3",
+          "tests/testthat/test-geoparquet-edge-cases.R": "d2e414868d3ad866ebbd51251ba490e5a286d9c393f5de8f205a251df826c79e",
+          "tests/testthat/test-geoparquet-options.R": "1671067abc00e7ef1511a8aa50eac45842dd22e7f229399fe7087c8ebdc54cdc",
+          "tests/testthat/test-geoparquet-v11.R": "c2e1b30d5656659c0d65ce419ec176fa49187ca37008168721e6a147429a5e53",
+          "tests/testthat/test-geoparquet-versions.R": "558e26ce354bd6cdccdb85f316c6358e301171fd6dc9a7dc1fa4498ac8596747"
+        },
+        "warning_messages_and_locations_identical_to_reference7": true,
+        "skip_reasons_identical_to_reference7": true,
+        "warning_multiset_sha256": "9a188e491aa8d8b56f1ebf4a07b0fe3b86509d6351767b6b0aba80ee92261c58"
+      },
+      {
+        "name": "simplification-stack-ubuntu-24.04-release",
+        "source_label": "stack",
+        "source_sha": "cefcf492809831d53794bca40220b9915a706857",
+        "job_id": 128509482884,
+        "artifact_id": 13589530850,
+        "artifact_sha256": "6ba94de12de586622b87338fd30bb196d9be876862d29e9626b61b3eb72c6821",
+        "check_status": "OK",
+        "environment": [
+          "* using R version 4.6.2 (2026-10-29)",
+          "* using platform: x86_64-pc-linux-gnu",
+          "* running under: Ubuntu 24.04.5 LTS",
+          "* using options \u2018--no-manual --as-cran\u2019"
+        ],
+        "testthat": {
+          "fail": 0,
+          "warn": 148,
+          "skip": 2,
+          "pass": 3641
+        },
+        "packaged_source_files_sha256": {
+          "R/io_geoparquet.R": "c7d5ad7489eb716ceb29b4e167fc17a52231ee53d2705c22dd06d8a4fbd95b57",
+          "R/io_write_dataset.R": "ecdbc5f9ef90f6388c2f26f126c9569d578b45b36bf4d4e806af219447491fc0",
+          "man/ddbs_write_dataset.Rd": "03a691a13a6cfd05710ecff1096e668633426d77579aa8aeb6378d3a531292aa",
+          "tests/testthat/test-geoparquet-crs.R": "15e2c88d36722117d8eaa940c2f891a5eb1e8c14a39ec2197379f8da3f8f0fe3",
+          "tests/testthat/test-geoparquet-dimensions.R": "b01582fa35755d26b0399ce2abfa91d99fb8d0f16324550540201680be9e3398",
+          "tests/testthat/test-geoparquet-edge-cases.R": "d2e414868d3ad866ebbd51251ba490e5a286d9c393f5de8f205a251df826c79e",
+          "tests/testthat/test-geoparquet-options.R": "1671067abc00e7ef1511a8aa50eac45842dd22e7f229399fe7087c8ebdc54cdc",
+          "tests/testthat/test-geoparquet-v11.R": "c2e1b30d5656659c0d65ce419ec176fa49187ca37008168721e6a147429a5e53",
+          "tests/testthat/test-geoparquet-versions.R": "558e26ce354bd6cdccdb85f316c6358e301171fd6dc9a7dc1fa4498ac8596747"
+        },
+        "warning_messages_and_locations_identical_to_reference7": true,
+        "skip_reasons_identical_to_reference7": true,
+        "warning_multiset_sha256": "9a188e491aa8d8b56f1ebf4a07b0fe3b86509d6351767b6b0aba80ee92261c58"
+      }
+    ],
+    "provenance": [
+      {
+        "name": "simplification-full-provenance-macos-latest-release",
+        "job_id": 128509482853,
+        "artifact_id": 13589030475,
+        "artifact_sha256": "32945b7aba59d6f54d15510c3081829c1d275c18089404354f58d2841c39c4a9",
+        "R_session_header": [
+          "R version 4.6.2 (2026-10-29)",
+          "Platform: aarch64-apple-darwin23",
+          "Running under: macOS Tahoe 26.7.2"
+        ],
+        "package_versions": {
+          "arrow": "26.0.0",
+          "DBI": "1.3.0",
+          "dbplyr": "2.6.0",
+          "dplyr": "1.2.1",
+          "duckdb": "2.0.0",
+          "geoarrow": "0.4.4",
+          "jsonlite": "2.0.0",
+          "rcmdcheck": "1.4.0",
+          "roxygen2": "8.1.1",
+          "sf": "1.1-3",
+          "testthat": "3.3.2",
+          "wk": "0.9.5"
+        },
+        "DuckDB_engine": {
+          "library_version": "v2.0.0",
+          "source_id": "d54cbbe3df",
+          "codename": "Cyanoptera"
+        },
+        "Spatial_extension": {
+          "extension_name": "spatial",
+          "extension_version": "a3dbcd1781",
+          "loaded": "TRUE",
+          "installed": "TRUE",
+          "install_mode": "REPOSITORY",
+          "installed_from": "core"
+        },
+        "source_integrity_verified": true
+      },
+      {
+        "name": "simplification-full-provenance-ubuntu-24.04-devel",
+        "job_id": 128509482880,
+        "artifact_id": 13587744382,
+        "artifact_sha256": "7a538bf3e4275d9384430d2f1bb032d42461a4fa38bcefbccd415ef4c8d30d3d",
+        "R_session_header": [
+          "R Under development (unstable) (2026-11-06 r90845)",
+          "Platform: x86_64-pc-linux-gnu",
+          "Running under: Ubuntu 24.04.5 LTS"
+        ],
+        "package_versions": {
+          "arrow": "26.0.0",
+          "DBI": "1.3.0",
+          "dbplyr": "2.6.0",
+          "dplyr": "1.2.1",
+          "duckdb": "2.0.0",
+          "geoarrow": "0.4.4",
+          "jsonlite": "2.0.0",
+          "rcmdcheck": "1.4.0",
+          "roxygen2": "8.1.1",
+          "sf": "1.1-3",
+          "testthat": "3.3.2",
+          "wk": "0.9.5"
+        },
+        "DuckDB_engine": {
+          "library_version": "v2.0.0",
+          "source_id": "d54cbbe3df",
+          "codename": "Cyanoptera"
+        },
+        "Spatial_extension": {
+          "extension_name": "spatial",
+          "extension_version": "a3dbcd1781",
+          "loaded": "TRUE",
+          "installed": "TRUE",
+          "install_mode": "REPOSITORY",
+          "installed_from": "core"
+        },
+        "source_integrity_verified": true
+      },
+      {
+        "name": "simplification-full-provenance-ubuntu-24.04-oldrel",
+        "job_id": 128509482894,
+        "artifact_id": 13588438818,
+        "artifact_sha256": "c24a02c3da63988717b3d890ea2a1e7d5b283713520135500e2583949c65e6d4",
+        "R_session_header": [
+          "R version 4.5.3 (2026-03-11)",
+          "Platform: x86_64-pc-linux-gnu",
+          "Running under: Ubuntu 24.04.5 LTS"
+        ],
+        "package_versions": {
+          "arrow": "26.0.0",
+          "DBI": "1.3.0",
+          "dbplyr": "2.6.0",
+          "dplyr": "1.2.1",
+          "duckdb": "2.0.0",
+          "geoarrow": "0.4.4",
+          "jsonlite": "2.0.0",
+          "rcmdcheck": "1.4.0",
+          "roxygen2": "8.1.1",
+          "sf": "1.1-3",
+          "testthat": "3.3.2",
+          "wk": "0.9.5"
+        },
+        "DuckDB_engine": {
+          "library_version": "v2.0.0",
+          "source_id": "d54cbbe3df",
+          "codename": "Cyanoptera"
+        },
+        "Spatial_extension": {
+          "extension_name": "spatial",
+          "extension_version": "a3dbcd1781",
+          "loaded": "TRUE",
+          "installed": "TRUE",
+          "install_mode": "REPOSITORY",
+          "installed_from": "core"
+        },
+        "source_integrity_verified": true
+      },
+      {
+        "name": "simplification-full-provenance-ubuntu-24.04-release",
+        "job_id": 128509482884,
+        "artifact_id": 13589700433,
+        "artifact_sha256": "956fc2ed12809d947b785dfb286c7894990fe7c547dbcb5cd2e4f1bf1e70497b",
+        "R_session_header": [
+          "R version 4.6.2 (2026-10-29)",
+          "Platform: x86_64-pc-linux-gnu",
+          "Running under: Ubuntu 24.04.5 LTS"
+        ],
+        "package_versions": {
+          "arrow": "26.0.0",
+          "DBI": "1.3.0",
+          "dbplyr": "2.6.0",
+          "dplyr": "1.2.1",
+          "duckdb": "2.0.0",
+          "geoarrow": "0.4.4",
+          "jsonlite": "2.0.0",
+          "rcmdcheck": "1.4.0",
+          "roxygen2": "8.1.1",
+          "sf": "1.1-3",
+          "testthat": "3.3.2",
+          "wk": "0.9.5"
+        },
+        "DuckDB_engine": {
+          "library_version": "v2.0.0",
+          "source_id": "d54cbbe3df",
+          "codename": "Cyanoptera"
+        },
+        "Spatial_extension": {
+          "extension_name": "spatial",
+          "extension_version": "a3dbcd1781",
+          "loaded": "TRUE",
+          "installed": "TRUE",
+          "install_mode": "REPOSITORY",
+          "installed_from": "core"
+        },
+        "source_integrity_verified": true
+      }
+    ],
+    "same_environment_comparisons": [
+      {
+        "reference": "reference7",
+        "candidate": "candidate",
+        "same_job_id": 128509482884,
+        "same_R_environment": true,
+        "reference_passes": 3526,
+        "candidate_passes": 3555,
+        "pass_delta": 29,
+        "delta_reason": "29 assertions in the new test-geoparquet-options.R file; existing regression files unchanged.",
+        "warning_messages_and_locations_identical": true,
+        "skip_reasons_identical": true
+      },
+      {
+        "reference": "reference8",
+        "candidate": "stack",
+        "same_job_id": 128509482884,
+        "same_R_environment": true,
+        "reference_passes": 3612,
+        "candidate_passes": 3641,
+        "pass_delta": 29,
+        "delta_reason": "29 assertions in the new test-geoparquet-options.R file; existing regression files unchanged.",
+        "warning_messages_and_locations_identical": true,
+        "skip_reasons_identical": true
+      }
+    ],
+    "warning_equivalence": {
+      "count_per_check": 148,
+      "all_10_checks_identical_messages_and_locations": true,
+      "canonical_multiset_sha256": "9a188e491aa8d8b56f1ebf4a07b0fe3b86509d6351767b6b0aba80ee92261c58",
+      "GeoParquet_warning_count": 0
+    },
+    "existing_skips": {
+      "count_per_check": 2,
+      "all_10_checks_identical": true,
+      "reasons": "\u2022 Skipping (2): 'test-ddbs_interpolate_aw.R:227:3',\n  'test-duckspatial_df_dplyr_methods.R:197:3'"
+    },
+    "evidence": {
+      "artifact_archives_checked": 14,
+      "all_archive_sha256_match_GitHub": true,
+      "all_10_packaged_export_sources_and_regression_files_match_exact_git_blobs": true,
+      "all_4_complete_job_logs_inspected": true
+    }
+  },
+  "limitations": [
+    "No passing full Windows package check is claimed; the previously investigated failure remains unresolved.",
+    "GDAL Parquet interoperability is unverified because GDAL 3.12.4 lacks the Parquet driver.",
+    "Core-validator skips are disclosed individually; they are not counted as passes.",
+    "Behavioral equivalence is established for the preserved regressions and selected fixtures in the recorded environment, not every possible input."
+  ]
+}

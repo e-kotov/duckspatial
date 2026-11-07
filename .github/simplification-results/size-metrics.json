@@ -1,0 +1,100 @@
+{
+  "main": {
+    "source_sha": "677ed965894f20b5f83bdc6a389f42ccddb6a7ba",
+    "R/io_geoparquet.R": {
+      "total": 0
+    },
+    "R/io_write_dataset.R": {
+      "total": 617,
+      "roxygen": 114,
+      "code": 379,
+      "blank": 65,
+      "comment": 59
+    },
+    "public_roxygen": {
+      "lines": 104,
+      "words_excluding_roxygen_prefix": 572
+    },
+    "generated_help": {
+      "lines": 147
+    },
+    "r_totals": {
+      "roxygen": 114,
+      "code": 379,
+      "blank": 65,
+      "comment": 59
+    },
+    "geoparquet_tests": {
+      "files": 0,
+      "lines": 0
+    }
+  },
+  "reference7": {
+    "source_sha": "04c34956cb71d2ab6d23072fc9774e9c4d09bc8d",
+    "R/io_geoparquet.R": {
+      "total": 412,
+      "comment": 46,
+      "blank": 13,
+      "roxygen": 10,
+      "code": 343
+    },
+    "R/io_write_dataset.R": {
+      "total": 650,
+      "roxygen": 176,
+      "code": 385,
+      "blank": 53,
+      "comment": 36
+    },
+    "public_roxygen": {
+      "lines": 166,
+      "words_excluding_roxygen_prefix": 1074
+    },
+    "generated_help": {
+      "lines": 214
+    },
+    "r_totals": {
+      "comment": 82,
+      "blank": 66,
+      "roxygen": 186,
+      "code": 728
+    },
+    "geoparquet_tests": {
+      "files": 4,
+      "lines": 724
+    }
+  },
+  "candidate": {
+    "source_sha": "22de905bc18988c4cd0e56eafe6cb6dba50248ae",
+    "R/io_geoparquet.R": {
+      "total": 403,
+      "comment": 35,
+      "blank": 13,
+      "roxygen": 10,
+      "code": 345
+    },
+    "R/io_write_dataset.R": {
+      "total": 600,
+      "roxygen": 141,
+      "code": 347,
+      "blank": 57,
+      "comment": 55
+    },
+    "public_roxygen": {
+      "lines": 133,
+      "words_excluding_roxygen_prefix": 796
+    },
+    "generated_help": {
+      "lines": 181
+    },
+    "r_totals": {
+      "comment": 90,
+      "blank": 70,
+      "roxygen": 151,
+      "code": 692
+    },
+    "geoparquet_tests": {
+      "files": 5,
+      "lines": 875
+    }
+  }
+}
