@@ -13,6 +13,15 @@ pr182_geo_metadata <- function(conn, path) {
   jsonlite::fromJSON(raw[[1L]], simplifyVector = FALSE)
 }
 
+
+# Preserve full PROJJSON numeric precision. jsonlite's default rounding
+# changes ellipsoid parameters and prevents sf/PROJ from identifying EPSG.
+pr182_parse_crs <- function(json) {
+  sf::st_crs(as.character(jsonlite::toJSON(
+    json, auto_unbox = TRUE, digits = NA
+  )))
+}
+
 pr182_row_count <- function(conn, path) {
   quoted <- as.character(DBI::dbQuoteString(conn, path))
   as.integer(DBI::dbGetQuery(
@@ -72,8 +81,7 @@ test_that("PR182 selected/renamed geometry survives GeoParquet metadata and quer
     expect_equal(md$primary_column, "geom2")
     expect_true("geom2" %in% names(md$columns))
     expect_false("geometry" %in% names(md$columns))
-    expect_equal(sf::st_crs(jsonlite::toJSON(md$columns$geom2$crs,
-                                            auto_unbox = TRUE))$epsg, 4326)
+    expect_equal(pr182_parse_crs(md$columns$geom2$crs)$epsg, 4326)
     unlink(path)
   }
 })
@@ -97,7 +105,7 @@ test_that("PR182 reprojecting mutate never reuses stale old CRS", {
     md <- pr182_geo_metadata(conn, path)
     current <- md$columns$geometry$crs
     if (!is.null(current)) {
-      epsg <- sf::st_crs(jsonlite::toJSON(current, auto_unbox = TRUE))$epsg
+      epsg <- pr182_parse_crs(current)$epsg
       expect_false(identical(epsg, 4326L),
                    info = paste("stale EPSG:4326 in", version))
     }
@@ -110,8 +118,7 @@ test_that("PR182 reprojecting mutate never reuses stale old CRS", {
     ddbs_write_dataset(projected, path, conn = conn, crs = "EPSG:3857",
                        geoparquet_version = version, quiet = TRUE)
     md <- pr182_geo_metadata(conn, path)
-    expect_equal(sf::st_crs(jsonlite::toJSON(md$columns$geometry$crs,
-                                            auto_unbox = TRUE))$epsg, 3857)
+    expect_equal(pr182_parse_crs(md$columns$geometry$crs)$epsg, 3857)
     unlink(path)
   }
 })
