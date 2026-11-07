@@ -3,7 +3,7 @@
 
 #' @noRd
 ddbs_geoparquet_version <- function(version, native = FALSE) {
-  choices <- if (native) c("V1", "V2", "BOTH", "NONE") else c("V1", "V2")
+  choices <- if (native) c("V1", "V1.1", "V2", "BOTH", "NONE") else c("V1", "V1.1", "V2")
   if (!is.character(version) || length(version) != 1L || is.na(version) ||
       !toupper(version) %in% choices) {
     cli::cli_abort("{.arg geoparquet_version} must be one of {.val {choices}}.")
@@ -79,13 +79,14 @@ ddbs_geoparquet_projjson <- function(crs) {
 
 #' @noRd
 ddbs_geoparquet_cast <- function(expr, crs, projjson, conn, version) {
-  # V1 uses ordinary WKB BLOB columns and explicit geo metadata.
-  if (version == "V1") {
-    # GeoParquet 1.0 permits XY/XYZ, but not measured WKB. Check while
+  # V1 and V1.1 use WKB BLOB columns and explicit geo metadata.
+  if (version %in% c("V1", "V1.1")) {
+    # GeoParquet 1.0/1.1 permit XY/XYZ, but not measured WKB. Check while
     # streaming the COPY query rather than scanning the input a second time.
     geom <- paste0("CAST(", expr, " AS GEOMETRY)")
     message <- DBI::dbQuoteString(conn, paste0(
-      "GeoParquet 1.0 does not support measured (M/ZM) geometries; ",
+      "GeoParquet ", if (version == "V1.1") "1.1" else "1.0",
+      " does not support measured (M/ZM) geometries; ",
       "use geoparquet_version = 'V2'."
     ))
     return(paste0("ST_AsWKB(CASE WHEN ST_HasM(", geom, ") THEN error(",
@@ -96,7 +97,7 @@ ddbs_geoparquet_cast <- function(expr, crs, projjson, conn, version) {
     # GEOMETRY produces a native CRS84 default, conflicting with crs: null.
     cli::cli_abort(c(
       "GeoParquet 2.0 cannot encode an undefined/unknown CRS with this DuckDB writer.",
-      "i" = "Use {.code geoparquet_version = 'V1'} or explicitly assign a known {.arg crs}."
+      "i" = "Use {.code geoparquet_version = 'V1'} or {.code 'V1.1'} (WKB), or explicitly assign a known {.arg crs}."
     ))
   }
   text <- if (is.na(crs)) {
@@ -196,7 +197,7 @@ ddbs_write_geoparquet <- function(data, path, conn, overwrite, crs, options,
   resolved <- ddbs_geoparquet_options(options, version, version_explicit)
   version <- resolved$version
   options <- resolved$options
-  managed_metadata <- version %in% c("V1", "V2")
+  managed_metadata <- version %in% c("V1", "V1.1", "V2")
   if (!is.logical(spatial_order) || length(spatial_order) != 1L || is.na(spatial_order)) {
     cli::cli_abort("{.arg parquet_spatial_order} must be TRUE or FALSE.")
   }
@@ -327,8 +328,8 @@ ddbs_write_geoparquet <- function(data, path, conn, overwrite, crs, options,
   if (spatial_order) {
     geom <- paste0("_ddbs_src.", sql_ident(primary))
     bounds_geom <- sql_ident(primary)
-    if (version == "V1") {
-      # V1 selects WKB BLOBs; decode only for spatial ordering.
+    if (version %in% c("V1", "V1.1")) {
+      # V1/V1.1 select WKB BLOBs; decode only for spatial ordering.
       geom <- paste0("ST_GeomFromWKB(", geom, ")")
       bounds_geom <- paste0("ST_GeomFromWKB(", bounds_geom, ")")
     }
@@ -391,7 +392,7 @@ ddbs_write_geoparquet <- function(data, path, conn, overwrite, crs, options,
       cli::cli_abort("The {.code geo} metadata key is managed by duckspatial.")
     }
     metadata$geo <- ddbs_geoparquet_metadata(
-      projjson, primary, if (version == "V2") "2.0.0" else "1.0.0"
+      projjson, primary, if (version == "V2") "2.0.0" else if (version == "V1.1") "1.1.0" else "1.0.0"
     )
     copy$KV_METADATA <- metadata
   }

@@ -39,13 +39,13 @@
 #' @param overwrite Logical. If `TRUE`, overwrites existing file.
 #' @param crs Output CRS assignment (e.g., `"EPSG:4326"`), or `NULL` to keep the
 #'   input CRS. Passed to GDAL as `SRS`; for Parquet, affects only the active
-#'   geometry. `NA` means unknown in V1; V2 requires a known CRS. Coordinates
+#'   geometry. `NA` means unknown in V1/V1.1; V2 requires a known CRS. Coordinates
 #'   are unchanged; use [ddbs_transform()] or [sf::st_transform()] to reproject.
 #' @param layer Table name for native DuckDB database output.
 #' @param options Named list of additional `COPY` options. For Parquet, names
 #'   are case-insensitive and options override the convenience arguments.
 #'   `GEOPARQUET_VERSION` may select the version, but must agree with an explicit
-#'   `geoparquet_version`. For V1/V2, `KV_METADATA` is a named list of strings
+#'   `geoparquet_version`. For V1/V1.1/V2, `KV_METADATA` is a named list of strings
 #'   with `geo` reserved. `PARTITION_BY` accepts column names or a parenthesized
 #'   SQL identifier list. Spatial ordering requires `PRESERVE_ORDER = TRUE`.
 #' @param partitioning Character vector of columns to partition by (Parquet/CSV only).
@@ -70,7 +70,8 @@
 #'   }
 #'   Other major version strings like \code{"v1.4.0"}, \code{"v1.3.0"}, etc., are also supported.
 #' @param geoparquet_version Parquet output version: `"V1"` (default, GeoParquet
-#'   1.0.0) or `"V2"` (2.0.0, native geometry types and row-group statistics).
+#'   1.0.0), `"V1.1"` (1.1.0, WKB) or `"V2"` (2.0.0, native geometry types
+#'   and row-group statistics).
 #'   Independent of `PARQUET_VERSION` and `duckdb_storage_version`.
 #' @param parquet_spatial_order Logical, default `FALSE`. If `TRUE`, order
 #'   Parquet rows by the active geometry's Hilbert index, with null and empty
@@ -83,7 +84,8 @@
 #' Parquet exports preserve the active and secondary geometry columns and their
 #' CRS. Lazy exports use the current query's native CRS, with the stored CRS
 #' attribute as a fallback for legacy DuckDB storage.
-#' V1 supports XY/XYZ; measured XYM/XYZM geometries require V2.
+#' V1 and V1.1 support XY/XYZ; measured XYM/XYZM geometries require V2.
+#' V1.1 uses WKB without optional coordinate encodings or bbox covering columns.
 #' Geometry columns must be top-level, and column names must be unique ignoring
 #' ASCII case.
 #'
@@ -97,6 +99,7 @@
 #' particularly its \code{write_dataset} and \code{write_geo} functions.
 #' For advanced features like cloud storage (S3) support, the 
 #' \code{duckdbfs} package is highly recommended.
+#' \url{https://geoparquet.org/releases/v1.1.0/}
 #' \url{https://geoparquet.org/releases/v2.0.0/}
 #' 
 #' @export
