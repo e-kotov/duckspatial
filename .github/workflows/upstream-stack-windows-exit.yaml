@@ -1,0 +1,51 @@
+name: Clean stack Windows exit check
+
+on:
+  push:
+    branches: [debug/geoparquet-upstream-validation-20261107]
+    paths: ['.github/workflows/upstream-stack-windows-exit.yaml']
+
+permissions:
+  contents: read
+
+jobs:
+  full-suite:
+    name: V1.1 complete Windows suite and process exit
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      NOT_CRAN: 'true'
+      SOURCE_SHA: c9ad8393c2eaf0d96eee7cedee3af379efff01b3
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: harness
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          path: package
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: release
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          working-directory: package
+          extra-packages: local::., any::testthat, any::pkgload
+          needs: check
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Run every unchanged test and require actual process exit
+        working-directory: package
+        shell: pwsh
+        run: |
+          python ../harness/.github/upstream-validation/windows-test-supervisor.py --runner ../harness/.github/upstream-validation/windows-test-diagnostics.R --label v11-full --expected-sha $env:SOURCE_SHA --limit 900
+          exit $LASTEXITCODE
+      - name: Preserve complete-suite and process-exit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stack-windows-full-suite-${{ github.run_attempt }}
+          path: package/diagnostics
+          if-no-files-found: warn
