@@ -1,0 +1,80 @@
+name: Experimental GeoParquet 1.1 WKB conformance
+on:
+  push:
+    branches: [experiment/geoparquet-1-1-feasibility-20261107]
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    env:
+      RSPM: https://packagemanager.rstudio.com/cran/__linux__/noble/latest
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: release
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: local::.
+          needs: NA
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install independent GeoParquet validator
+        run: python -m pip install 'pyarrow>=26' 'shapely>=2.1' pyproj 'geoparquet-validator>=0.3.1'
+      - name: Generate WKB GeoParquet 1.1 datasets
+        shell: Rscript {0}
+        run: |
+          library(duckspatial)
+          library(DBI)
+          library(duckdb)
+          library(sf)
+          c <- dbConnect(duckdb(),dbdir=":memory:")
+          dbExecute(c,"INSTALL spatial")
+          dbExecute(c,"LOAD spatial")
+          dir.create("gp11-test",showWarnings=FALSE)
+          mk <- function(name, data, options=list()) {
+            p <- file.path("gp11-test",paste0(name,".parquet"))
+            ddbs_write_dataset(data,p,conn=c,geoparquet_version="V1.1",options=options,quiet=TRUE)
+            stopifnot(file.exists(p))
+            kv <- dbGetQuery(c,sprintf("SELECT decode(value) AS v FROM parquet_kv_metadata('%s') WHERE decode(key)='geo'",p))
+            m <- jsonlite::fromJSON(kv$v[[1]])
+            stopifnot(identical(m$version,"1.1.0"))
+            cat("FILE=",p," version=",m$version,"\n")
+            read <- ddbs_open_dataset(p,conn=c)
+            got <- ddbs_collect(read)
+            stopifnot(inherits(got,"sf"), nrow(got)==nrow(data))
+            cat("ROUNDTRIP=",p,"\n")
+          }
+          d <- st_as_sf(data.frame(id=1:3,x=c(1,2,3),y=c(2,3,4)),coords=c("x","y"),crs=4326)
+          mk("points",d)
+          geom <- st_sfc(st_linestring(matrix(c(0,0,4,4),ncol=2,byrow=TRUE)),
+                         st_polygon(list(matrix(c(0,0,4,0,4,4,0,0),ncol=2,byrow=TRUE))),st_point(),crs=3857)
+          d2 <- st_sf(id=1:3,geometry=geom)
+          mk("mixed",d2)
+          st_crs(d2) <- NA
+          mk("unknown-crs",d2)
+          st_crs(d) <- 3857
+          d$other <- st_geometry(st_transform(d,4326))
+          mk("multiple-geometry",d)
+          dbDisconnect(c,shutdown=TRUE)
+      - name: Inspect schema independently and validate GeoParquet 1.1 core rules
+        run: |
+          python - <<'PY'
+          import glob, json, pyarrow.parquet as pq
+          for fn in sorted(glob.glob("gp11-test/*.parquet")):
+              f=pq.ParquetFile(fn)
+              m=json.loads(f.metadata.metadata[b'geo'])
+              assert m['version']=='1.1.0',fn
+              for name,col in m['columns'].items():
+                  assert col['encoding']=='WKB',fn
+                  schema_col=f.schema.column(f.schema.names.index(name))
+                  assert schema_col.physical_type=='BYTE_ARRAY',fn
+                  assert 'Geometry' not in schema_col.logical_type.to_json(),fn
+              print("SCHEMA_VALID",fn)
+          PY
+          for f in gp11-test/*.parquet; do
+            echo "Validating $f"
+            geoparquet-validator check "$f" --class core
+          done
