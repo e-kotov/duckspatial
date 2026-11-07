@@ -343,7 +343,13 @@ ddbs_write_dataset <- function(
   
   if (inherits(data, c("duckspatial_df", "tbl_lazy", "tbl_duckdb_connection"))) {
     # Efficient table name extraction or subquery construction
-    r_name <- attr(data, "source_table") %||% dbplyr::remote_name(data)
+    # Upstream PR #182: trust source_table only if it matches the query.
+    r_name <- tryCatch(dbplyr::remote_name(data), error = function(e) NULL)
+    source_table <- attr(data, "source_table")
+    if (!is.null(source_table) && !is.null(r_name) && !inherits(r_name, "sql") &&
+        as.character(r_name) == source_table) {
+      r_name <- source_table
+    }
     is_simple_table <- !is.null(r_name) && is.character(r_name)
     
     if (is_simple_table) {
