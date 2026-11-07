@@ -61,7 +61,7 @@ jobs:
       - name: Generate direct DuckDB SQL COPY outputs for typed lazy geometry
         run: Rscript harness/.github/upstream-validation/experiment/compare_delegation.R direct "$PWD/compare/direct" "$PWD/enhanced-lib"
       - name: Confirm enhanced fixtures satisfy independently defined expectations
-        run: python harness/.github/upstream-validation/interop/validate_geoparquet.py "$PWD/compare/enhanced"
+        run: python harness/.github/upstream-validation/experiment/validate_geoparquet.py "$PWD/compare/enhanced"
       - name: Independent side-by-side semantic analysis
         run: python harness/.github/upstream-validation/experiment/compare_semantics.py "$PWD/compare"
       - name: Preserve complete inputs, outputs and conclusions
