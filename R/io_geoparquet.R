@@ -3,7 +3,7 @@
 
 #' @noRd
 ddbs_geoparquet_version <- function(version, native = FALSE) {
-  choices <- if (native) c("V1", "V2", "BOTH", "NONE") else c("V1", "V2")
+  choices <- if (native) c("V1", "V1.1", "V2", "BOTH", "NONE") else c("V1", "V1.1", "V2")
   if (!is.character(version) || length(version) != 1L || is.na(version) ||
       !toupper(version) %in% choices) {
     cli::cli_abort("{.arg geoparquet_version} must be one of {.val {choices}}.")
@@ -80,12 +80,12 @@ ddbs_geoparquet_projjson <- function(crs) {
 #' @noRd
 ddbs_geoparquet_cast <- function(expr, crs, conn, version) {
   # V1 uses ordinary WKB BLOB columns and explicit geo metadata.
-  if (version == "V1") {
+  if (version %in% c("V1", "V1.1")) {
     # GeoParquet 1.0 permits XY/XYZ, but not measured WKB. Check while
     # streaming the COPY query rather than scanning the input a second time.
     geom <- paste0("CAST(", expr, " AS GEOMETRY)")
     message <- DBI::dbQuoteString(conn, paste0(
-      "GeoParquet 1.0 does not support measured (M/ZM) geometries; ",
+      "GeoParquet 1.x does not support measured (M/ZM) geometries; ",
       "use geoparquet_version = 'V2'."
     ))
     return(paste0("ST_AsWKB(CASE WHEN ST_HasM(", geom, ") THEN error(",
@@ -332,7 +332,7 @@ ddbs_write_geoparquet <- function(data, path, conn, overwrite, crs, options,
   if (spatial_order) {
     geom <- paste0("_ddbs_src.", quote_id(primary))
     bounds_geom <- quote_id(primary)
-    if (version == "V1") {
+    if (version %in% c("V1", "V1.1")) {
       # V1 selects WKB BLOBs; decode only for spatial ordering.
       geom <- paste0("ST_GeomFromWKB(", geom, ")")
       bounds_geom <- paste0("ST_GeomFromWKB(", bounds_geom, ")")
@@ -380,7 +380,7 @@ ddbs_write_geoparquet <- function(data, path, conn, overwrite, crs, options,
       cli::cli_abort("A compression level requires {.code parquet_compression = 'zstd'}.")
     }
   }
-  if (version %in% c("V1", "V2")) {
+  if (version %in% c("V1", "V1.1", "V2")) {
     # NONE disables DuckDB's automatic geo metadata. V2 keeps native geometry
     # logical types/statistics; V1 explicitly selects WKB BLOBs instead.
     copy$GEOPARQUET_VERSION <- "NONE"
@@ -393,7 +393,7 @@ ddbs_write_geoparquet <- function(data, path, conn, overwrite, crs, options,
       cli::cli_abort("The {.code geo} metadata key is managed by duckspatial.")
     }
     metadata$geo <- ddbs_geoparquet_metadata(
-      crses, primary, if (version == "V2") "2.0.0" else "1.0.0"
+      crses, primary, if (version == "V2") "2.0.0" else if (version == "V1.1") "1.1.0" else "1.0.0"
     )
     copy$KV_METADATA <- metadata
   }
