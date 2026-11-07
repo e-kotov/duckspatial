@@ -1,0 +1,73 @@
+name: Experiment - minimal DuckDB GeoParquet delegation
+
+on:
+  push:
+    branches:
+      - experiment/direct-duckdb-geoparquet-comparison-20261107
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      NOT_CRAN: "true"
+    steps:
+      - name: Experiment harness only
+        uses: actions/checkout@v6
+        with:
+          path: harness
+      - name: Checkout original duckspatial writer
+        uses: actions/checkout@v6
+        with:
+          ref: 677ed965894f20b5f83bdc6a389f42ccddb6a7ba
+          path: baseline
+      - name: Checkout reviewed GeoParquet V1/V1.1/V2 writer
+        uses: actions/checkout@v6
+        with:
+          ref: c9ad8393c2eaf0d96eee7cedee3af379efff01b3
+          path: enhanced
+      - name: Verify exact frozen package commits
+        run: |
+          test "$(git -C baseline rev-parse HEAD)" = "677ed965894f20b5f83bdc6a389f42ccddb6a7ba"
+          test "$(git -C enhanced rev-parse HEAD)" = "c9ad8393c2eaf0d96eee7cedee3af379efff01b3"
+          git -C baseline diff --exit-code
+          git -C enhanced diff --exit-code
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: release
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          working-directory: enhanced
+          extra-packages: local::.
+          needs: check
+      - name: Install both package versions into isolated R libraries
+        run: |
+          mkdir -p baseline-lib enhanced-lib
+          R CMD INSTALL --library="$PWD/baseline-lib" baseline
+          R CMD INSTALL --library="$PWD/enhanced-lib" enhanced
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Independent readers
+        run: python -m pip install 'pyarrow>=26' 'shapely>=2.1' 'pyproj>=3.7' 'geopandas>=1.2' 'pyogrio>=0.11'
+      - name: Generate enhanced reference outputs
+        run: Rscript harness/.github/upstream-validation/experiment/compare_delegation.R enhanced "$PWD/compare/enhanced" "$PWD/enhanced-lib"
+      - name: Generate unchanged pre-PR writer outputs with DuckDB version option
+        run: Rscript harness/.github/upstream-validation/experiment/compare_delegation.R legacy "$PWD/compare/legacy" "$PWD/baseline-lib"
+      - name: Generate direct DuckDB SQL COPY outputs for typed lazy geometry
+        run: Rscript harness/.github/upstream-validation/experiment/compare_delegation.R direct "$PWD/compare/direct" "$PWD/enhanced-lib"
+      - name: Confirm enhanced fixtures satisfy independently defined expectations
+        run: python harness/.github/upstream-validation/interop/validate_geoparquet.py "$PWD/compare/enhanced"
+      - name: Independent side-by-side semantic analysis
+        run: python harness/.github/upstream-validation/experiment/compare_semantics.py "$PWD/compare"
+      - name: Preserve complete inputs, outputs and conclusions
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: geoparquet-minimal-vs-enhanced
+          path: compare/
+          if-no-files-found: warn
