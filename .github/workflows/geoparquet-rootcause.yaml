@@ -1,0 +1,43 @@
+name: Experiment - GeoParquet root cause across R and Python
+
+on:
+  push:
+    branches:
+      - experiment/geoparquet-v2-rootcause-20261107
+
+permissions:
+  contents: read
+
+jobs:
+  native-duckdb:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      NOT_CRAN: 'true'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: release
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: local::.
+          needs: check
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install independent DuckDB Python driver and Parquet inspector
+        run: python -m pip install 'duckdb==2.0.0' 'pyarrow>=26'
+      - name: Bare DuckDB Python SQL reproduction
+        run: python .github/geoparquet-rootcause/duckdb_sql.py rootcause/python
+      - name: Bare R DBI DuckDB reproduction (no duckspatial)
+        run: Rscript .github/geoparquet-rootcause/duckdb_sql.R rootcause/r .github/geoparquet-rootcause/cases.json
+      - name: Compare physical Parquet metadata across drivers
+        run: python .github/geoparquet-rootcause/compare_native.py rootcause
+      - name: Preserve reproducer outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: geoparquet-v2-native-rootcause
+          path: rootcause/
+          if-no-files-found: warn
