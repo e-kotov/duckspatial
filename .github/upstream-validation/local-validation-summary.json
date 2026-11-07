@@ -1,0 +1,39 @@
+{
+  "source_sha": "c9ad8393c2eaf0d96eee7cedee3af379efff01b3",
+  "artifact_id": 13575577292,
+  "artifact_sha256": "34e81d736d84c341c846c52c4bb9cb4f07bfae5583956fe73155861b62667132",
+  "checks": [
+    {
+      "script": "validate_geoparquet.py",
+      "sha256": "f31a7a1271332ecc3f3f38e4285b3b9cd4144783e5f15e5e4546c9609d77d609",
+      "process_exit_code": 0
+    },
+    {
+      "script": "validate_geoparquet_readers.py",
+      "sha256": "8cc8280ae37119c8b01f4d798558e29206735efd830ebddd7f7013a1ea7ebb07",
+      "process_exit_code": 0
+    },
+    {
+      "script": "run_core_conformance.py",
+      "sha256": "52f8137331438889b559c7e8774f2b3123f519c19833b6c2ad9ac2da0f986da2",
+      "process_exit_code": 0
+    }
+  ],
+  "all_physical_file_digests_verified": true,
+  "physical_files": 34,
+  "core_outcomes": {
+    "pass": 346,
+    "skip": 334
+  },
+  "geopandas_read_counts": {
+    "1.0.0": 11,
+    "1.1.0": 12,
+    "2.0.0": 11
+  },
+  "same_version_roundtrip_counts": {
+    "1.0.0": 11,
+    "1.1.0": 12,
+    "2.0.0": 11
+  },
+  "gdal_parquet": "unavailable: GDAL 3.12.4 build lacks Parquet driver"
+}

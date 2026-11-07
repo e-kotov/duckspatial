@@ -153,9 +153,9 @@ fixture cleanup, and two production result-cleanup paths together.
   Spatial DLL C++/MinGW TLS-cleanup shutdown wait with an outstanding pthread
   key-table reader. That is a concrete external defect matching the full-suite
   final-exit symptom, not proof that every native failure shares one cause.
-- **Not established:** which leaked legacy test connection was involved in the
-  baseline access violation, or that adding cleanup to those two tests fixes
-  it. These are separate fixture-maintenance candidates, not grounds for
+- **Not established:** which connection was being disconnected, whether it
+  belonged to a legacy optional-extension fixture, or that adding cleanup to
+  those two tests fixes the crash. These are separate fixture-maintenance candidates, not grounds for
   changing the GeoParquet contribution.
 
 No production code, test cases, thread defaults or failure gates were changed

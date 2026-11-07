@@ -1,0 +1,28 @@
+{
+  "base": "518647c2c685304c26335386876e504339a7a681",
+  "head": "c9ad8393c2eaf0d96eee7cedee3af379efff01b3",
+  "tree": "942c9ed8e6b6188ed104c69632fae264d3b724f6",
+  "changed_files": [
+    "NEWS.md",
+    "R/io_geoparquet.R",
+    "R/io_write_dataset.R",
+    "man/ddbs_write_dataset.Rd",
+    "tests/testthat/test-geoparquet-v11.R"
+  ],
+  "PR5_paths_unchanged_or_absent": [
+    ".github/windows-test-supervisor.py",
+    ".github/workflows/geoparquet-interop.yaml",
+    ".github/workflows/windows-geoparquet-diagnostics.yaml",
+    "R/nanoarrow_methods.R",
+    "R/utils_not_exported.R",
+    "tests/testthat/test-db_extension.R",
+    "tests/testthat/test-ddbs_open_dataset.R",
+    "tests/testthat/test-ddbs_write_dataset-validation.R",
+    "tests/testthat/test-duckdbfs-interop.R",
+    "tests/testthat/test-import_view_to_connection.R",
+    "tests/testthat/test-internal-helpers.R",
+    "tests/testthat/test-nanoarrow_methods.R",
+    "tools/generate_geoparquet_fixtures.R",
+    "tools/validate_geoparquet.py"
+  ]
+}
