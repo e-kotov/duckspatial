@@ -14,6 +14,9 @@ uses `sources.json` to choose one of two stages:
   The stack SHA is not required in this stage.
 - `validate`: compare the final candidate and V1.1 stack against the unchanged
   #7/#8 reference SHAs. Set both final source SHAs before triggering this stage.
+- `probe`: characterize missing, empty and quoted identifiers against the
+  unchanged #7 and candidate, in isolated installed packages. This diagnostic
+  records behavior differences; it does not replace the regression checks.
 
 The paired Linux and Windows jobs install all package dependencies once, then
 install each of the four source packages into separate libraries. The original

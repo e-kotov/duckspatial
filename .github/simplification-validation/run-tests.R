@@ -15,7 +15,7 @@ capture.output(sessionInfo(), file = file.path(out, paste0(label, "-session-befo
 status <- tryCatch({
   extra_file <- Sys.getenv("EXTRA_CONTRACT_TEST_FILE")
   files <- if (nzchar(extra_file)) extra_file else
-    testthat:::find_test_scripts("tests/testthat", filter = filter)
+    testthat:::find_test_scripts("tests/testthat", filter = filter, full.names = FALSE)
   stopifnot(length(files) > 0L)
   writeLines(files, file.path(out, paste0(label, "-selected-tests.txt")))
   if (nzchar(extra_file)) {

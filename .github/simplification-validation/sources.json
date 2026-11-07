@@ -1,5 +1,5 @@
 {
-  "mode": "validate",
+  "mode": "probe",
   "base": "677ed965894f20b5f83bdc6a389f42ccddb6a7ba",
   "reference7": "04c34956cb71d2ab6d23072fc9774e9c4d09bc8d",
   "candidate": "1346266af8c640d05e5f6fa413fad473a8a95c1d",

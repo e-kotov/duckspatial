@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 
 config = json.loads(Path(__file__).with_name("sources.json").read_text())
-assert config["mode"] in ("documentation", "validate")
+assert config["mode"] in ("documentation", "validate", "probe")
 required = ("base", "reference7", "candidate", "reference8")
 if config["mode"] == "validate":
     required += ("stack",)
