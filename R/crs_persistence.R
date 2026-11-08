@@ -186,32 +186,41 @@ duckdb_geometry_type <- function(conn, x) {
   paste0("GEOMETRY(", ddbs_quote_sql_string(conn, lit$literal), ")")
 }
 
+# Parse a declared DuckDB geometry type; no row values are needed.
+ddbs_crs_from_geometry_type <- function(type) {
+  if (!is.character(type) || length(type) != 1L || is.na(type)) {
+    return(sf::st_crs(NA))
+  }
+  match <- regmatches(
+    type, regexec("^GEOMETRY\\('((?:''|[^'])*)'\\)$", type, perl = TRUE)
+  )[[1]]
+  if (length(match) != 2L) return(sf::st_crs(NA))
+  literal <- gsub("''", "'", match[[2]], fixed = TRUE)
+  tryCatch(sf::st_crs(literal), error = function(e) sf::st_crs(NA))
+}
+
 read_native_crs <- function(conn, table, geom_col) {
   q_geom <- as.character(DBI::dbQuoteIdentifier(conn, geom_col))
   q_table <- ddbs_quote_table(conn, table)
-  query <- paste0(
-    "SELECT ST_CRS(",
-    q_geom,
-    ") AS crs ",
-    "FROM ",
-    q_table,
-    " ",
-    "WHERE ",
-    q_geom,
-    " IS NOT NULL ",
-    "LIMIT 1"
+  desc <- tryCatch(
+    DBI::dbGetQuery(conn, paste0("DESCRIBE SELECT ", q_geom, " FROM ", q_table)),
+    error = function(e) NULL
   )
-
-  res <- tryCatch(DBI::dbGetQuery(conn, query), error = function(e) NULL)
-  if (
-    is.null(res) ||
-      nrow(res) == 0 ||
-      is.na(res$crs[[1]]) ||
-      identical(res$crs[[1]], "")
-  ) {
-    return(sf::st_crs(NA))
+  if (!is.null(desc) && nrow(desc) == 1L) {
+    parsed <- ddbs_crs_from_geometry_type(desc$column_type[[1]])
+    if (!is.na(parsed)) return(parsed)
   }
 
+  # Untyped GEOMETRY can carry per-feature CRS.
+  query <- paste0(
+    "SELECT ST_CRS(", q_geom, ") AS crs FROM ", q_table,
+    " WHERE ", q_geom, " IS NOT NULL LIMIT 1"
+  )
+  res <- tryCatch(DBI::dbGetQuery(conn, query), error = function(e) NULL)
+  if (is.null(res) || nrow(res) == 0L ||
+      is.na(res$crs[[1]]) || identical(res$crs[[1]], "")) {
+    return(sf::st_crs(NA))
+  }
   sf::st_crs(res$crs[[1]])
 }
 

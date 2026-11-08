@@ -230,10 +230,14 @@ ddbs_open_dataset <- function(path,
       }, error = function(e) NULL)
 
       if (is.null(geom_col)) {
-         if (!is.null(try_cols)) {
+         geo_meta <- get_parquet_geometry_metadata(path, conn)
+         primary <- geo_meta$primary_column
+         if (!is.null(primary) && !is.null(try_cols) &&
+             primary %in% try_cols$column_name) {
+             geom_col <- ddbs_describe_geometry_col(try_cols, primary)
+         }
+         if (is.null(geom_col)) {
              geom_col <- ddbs_describe_geometry_col(try_cols)
-         } else {
-             geom_col <- NULL
          }
       }
 
@@ -511,49 +515,32 @@ ddbs_open_dataset_crs <- function(crs, conn, view_name, geom_col, path, fmt) {
     return(if (inherits(crs, "crs")) crs else sf::st_crs(crs))
   }
 
-  crs_from_duckdb <- tryCatch({
-    q_geom <- DBI::dbQuoteIdentifier(conn, geom_col)
-    res <- DBI::dbGetQuery(conn, glue::glue(
-      "SELECT ST_CRS({q_geom}) AS crs ",
-      "FROM {view_name} ",
-      "WHERE {q_geom} IS NOT NULL ",
-      "LIMIT 1"
-    ))
-
-    if (nrow(res) == 0 || is.na(res$crs[1]) || identical(res$crs[1], "")) {
-      NULL
-    } else {
-      sf::st_crs(res$crs[1])
+  # The footer is authoritative, especially explicit crs: null. If a
+  # declared non-null custom PROJJSON cannot be parsed by sf, the native
+  # typed DuckDB geometry still provides an equivalent CRS fallback.
+  if (identical(fmt, "parquet")) {
+    from_footer <- get_parquet_crs(path, conn, geom_col)
+    if (!is.null(from_footer)) {
+      if (!is.na(from_footer)) return(from_footer)
+      meta <- get_parquet_geometry_metadata(path, conn)
+      column <- meta$columns[[geom_col]]
+      if (!is.null(column) && "crs" %in% names(column) &&
+          is.null(column$crs)) return(from_footer)
     }
-  }, error = function(e) NULL)
-
-  if (!is.null(crs_from_duckdb) && !is.na(crs_from_duckdb)) {
-    return(crs_from_duckdb)
   }
+
+  from_duckdb <- read_native_crs(conn, view_name, geom_col)
+  if (!is.na(from_duckdb)) return(from_duckdb)
 
   if (!identical(fmt, "parquet")) {
-    crs_from_gdal_meta <- withCallingHandlers(
+    from_gdal <- withCallingHandlers(
       tryCatch(get_file_crs(path, conn), error = function(e) NULL),
       warning = function(w) {
-        if (grepl("Cannot open|No such file|not recognized|missing value where", w$message, ignore.case = TRUE)) {
-          invokeRestart("muffleWarning")
-        }
+        if (grepl("Cannot open|No such file|not recognized|missing value where",
+                  w$message, ignore.case = TRUE)) invokeRestart("muffleWarning")
       }
     )
-
-    if (!is.null(crs_from_gdal_meta) && !is.na(crs_from_gdal_meta)) {
-      return(crs_from_gdal_meta)
-    }
-  }
-
-  if (identical(fmt, "parquet")) {
-    crs_from_geoparquet <- suppressWarnings(
-      tryCatch(get_parquet_crs(path, conn), error = function(e) NULL)
-    )
-
-    if (!is.null(crs_from_geoparquet) && !is.na(crs_from_geoparquet)) {
-      return(crs_from_geoparquet)
-    }
+    if (!is.null(from_gdal) && !is.na(from_gdal)) return(from_gdal)
   }
 
   warning("CRS could not be auto-detected; returning NA CRS.", call. = FALSE)

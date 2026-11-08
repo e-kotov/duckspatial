@@ -96,75 +96,46 @@ duckdb_file_info <- function(path) {
 #' @param conn DuckDB connection
 #' @return crs object or NULL
 #' @noRd
-get_parquet_crs <- function(path, conn) {
-  # Try to read GeoParquet metadata from KV metadata
-  # We extract the raw blob and parse in R to be more robust across platforms
-  
-  tryCatch({
-    safe_path <- DBI::dbQuoteString(conn, path)
-    
-    # 1. Extract the raw 'geo' metadata value
-    # We use decode(key) to handle blob keys if present
-    query <- glue::glue("
-      SELECT value
-      FROM parquet_kv_metadata({safe_path})
-      WHERE decode(key) = 'geo'
-      LIMIT 1
-    ")    
-    res <- DBI::dbGetQuery(conn, query)
-    
-    if (nrow(res) == 0 || is.null(res$value[[1]])) {
-      return(NULL)
+# Read only GeoParquet footer metadata; do not materialize feature rows.
+get_parquet_geometry_metadata <- function(path, conn) {
+  safe_path <- DBI::dbQuoteString(conn, path)
+  query <- glue::glue(
+    "SELECT value FROM parquet_kv_metadata({safe_path}) ",
+    "WHERE decode(key) = 'geo' LIMIT 1"
+  )
+  res <- tryCatch(DBI::dbGetQuery(conn, query), error = function(e) NULL)
+  if (is.null(res) || nrow(res) == 0L || is.null(res$value[[1]])) {
+    return(NULL)
+  }
+  tryCatch(
+    jsonlite::fromJSON(rawToChar(res$value[[1]]), simplifyVector = FALSE),
+    error = function(e) NULL
+  )
+}
+
+get_parquet_crs <- function(path, conn, geom_col = NULL) {
+  meta <- get_parquet_geometry_metadata(path, conn)
+  if (is.null(meta)) return(NULL)
+  geom_col <- geom_col %||% meta$primary_column
+  if (is.null(geom_col) || !geom_col %in% names(meta$columns)) return(NULL)
+
+  col_meta <- meta$columns[[geom_col]]
+  # GeoParquet: omitted CRS defaults to CRS84; explicit null is unknown.
+  if (!"crs" %in% names(col_meta)) return(sf::st_crs("OGC:CRS84"))
+  crs_data <- col_meta$crs
+  if (is.null(crs_data)) return(sf::st_crs(NA))
+
+  if (is.list(crs_data)) {
+    authority <- crs_data$id$authority
+    code <- crs_data$id$code
+    if (!is.null(authority) && !is.null(code)) {
+      result <- tryCatch(sf::st_crs(paste0(authority, ":", code)),
+                         error = function(e) sf::st_crs(NA))
+      if (!is.na(result)) return(result)
     }
-    
-    # 2. Parse JSON in R
-    # DuckDB returns BLOB as a raw vector in a list
-    meta_str <- rawToChar(res$value[[1]])
-    meta <- jsonlite::fromJSON(meta_str, simplifyVector = FALSE)
-    
-    # 3. Extract CRS for the primary column
-    primary_col <- meta$primary_column
-    if (is.null(primary_col) || !primary_col %in% names(meta$columns)) {
-       return(NULL)
-    }
-    
-    crs_data <- meta$columns[[primary_col]]$crs
-    if (is.null(crs_data)) {
-      return(NULL)
-    }
-    
-    # 4. Convert to sf CRS object
-    # If it's a list (PROJJSON), try to extract EPSG or convert to string
-    if (is.list(crs_data)) {
-      # Try to extract EPSG code for better compatibility
-      # Standard PROJJSON has id: {authority: "...", code: ...}
-      authority <- crs_data$id$authority
-      code <- crs_data$id$code
-      
-      if (!is.null(authority) && !is.null(code)) {
-        return(sf::st_crs(paste0(authority, ":", code)))
-      }
-      
-      # Handle cases where id might be a list of one element
-      if (is.list(crs_data$id) && length(crs_data$id) > 0) {
-        authority <- crs_data$id[[1]]$authority
-        code <- crs_data$id[[1]]$code
-        if (!is.null(authority) && !is.null(code)) {
-          return(sf::st_crs(paste0(authority, ":", code)))
-        }
-      }
-      
-      # Fallback to JSON string for sf::st_crs
-      crs_data <- jsonlite::toJSON(crs_data, auto_unbox = TRUE)
-    }
-    
-    return(sf::st_crs(crs_data))
-    
-  }, error = function(e) {
-    # If anything fails (file not found, bad format), warn and return NULL
-    cli::cli_warn("Failed to extract GeoParquet CRS: {e$message}")
-    NULL
-  })
+    crs_data <- jsonlite::toJSON(crs_data, auto_unbox = TRUE, digits = NA)
+  }
+  tryCatch(sf::st_crs(crs_data), error = function(e) sf::st_crs(NA))
 }
 
 #' Map extension to common GDAL driver names
