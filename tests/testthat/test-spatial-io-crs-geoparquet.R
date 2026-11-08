@@ -13,6 +13,10 @@ test_that("typed native CRS survives empty and NULL-only columns", {
   expect_equal(ddbs_crs("empty_crs", conn = conn)$epsg, 3857)
   expect_equal(ddbs_crs("null_crs", conn = conn)$epsg, 4326)
   expect_true(is.na(ddbs_crs("generic_crs", conn = conn)))
+  custom <- sf::st_crs("+proj=lcc +lat_1=33 +lat_2=45 +lat_0=39 +lon_0=-96 +datum=NAD83 +units=m")
+  DBI::dbExecute(conn, paste0("CREATE TABLE custom_zero (g ",
+                              duckspatial:::duckdb_geometry_type(conn, custom), ")"))
+  expect_true(duckspatial:::crs_equal(ddbs_crs("custom_zero", conn = conn), custom))
   DBI::dbExecute(conn, "CREATE VIEW typed_view AS SELECT * FROM empty_crs")
   expect_equal(ddbs_crs("typed_view", conn = conn)$epsg, 3857)
 })
@@ -67,5 +71,11 @@ test_that("GeoParquet metadata distinguishes absent CRS from explicit null", {
     ds <- ddbs_open_dataset(p, conn = conn)
     expect_s3_class(ds, "duckspatial_df")
     expect_equal(attr(ds, "sf_column"), "secondary")
+    expected <- if (identical(p, p_absent)) sf::st_crs("OGC:CRS84") else sf::st_crs(NA)
+    if (is.na(expected)) {
+      expect_true(is.na(sf::st_crs(ds)))
+    } else {
+      expect_true(duckspatial:::crs_equal(sf::st_crs(ds), expected))
+    }
   }
 })
