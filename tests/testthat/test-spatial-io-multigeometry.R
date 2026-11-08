@@ -101,3 +101,28 @@ test_that("multi-geometry collection handles zero rows and NULL geometry", {
   expect_true(all(sf::st_is_empty(out$active) | is.na(out$active)))
   expect_true(all(sf::st_is_empty(out$secondary) | is.na(out$secondary)))
 })
+
+
+test_that("mixed dimensions and empty geometries survive both ingestion paths", {
+  conn <- ddbs_temp_conn()
+  xyz <- sf::st_as_sfc(c("POINT Z (1 2 3)", "POINT Z EMPTY"), crs = 4326)
+  xyzm <- sf::st_as_sfc(c("POINT ZM (10 20 30 40)", "POINT ZM EMPTY"),
+                       crs = 3857)
+  input <- sf::st_sf(id = 1:2, height = xyz, measured = xyzm,
+                     sf_column_name = "measured")
+
+  for (temporary in c(FALSE, TRUE)) {
+    name <- if (temporary) "mixed_dim_view" else "mixed_dim_table"
+    ddbs_write_table(conn, input, name, quiet = TRUE, temp_view = temporary)
+    lazy <- as_duckspatial_df(name, conn = conn, geom_col = "measured")
+    result <- dplyr::collect(lazy, as = "sf")
+
+    expect_equal(attr(result, "sf_column"), "measured")
+    expect_equal(sf::st_as_binary(result$height), sf::st_as_binary(input$height))
+    expect_equal(sf::st_as_binary(result$measured), sf::st_as_binary(input$measured))
+    expect_equal(sf::st_crs(result$height)$epsg, 4326)
+    expect_equal(sf::st_crs(result$measured)$epsg, 3857)
+    expect_true(sf::st_is_empty(result$height)[2])
+    expect_true(sf::st_is_empty(result$measured)[2])
+  }
+})
