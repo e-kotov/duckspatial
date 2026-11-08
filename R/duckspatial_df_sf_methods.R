@@ -39,17 +39,21 @@ st_geometry.duckspatial_df <- function(obj, ...) {
 #' Convert WKB data to sfc
 #' @keywords internal
 convert_wkb_to_sfc <- function(geom_data, crs) {
-  if (inherits(geom_data, "sfc")) return(geom_data)
-  
-  # Use wk for fast conversion if possible
-  tryCatch({
-    attributes(geom_data) <- NULL
-    wkb_obj <- wk::new_wk_wkb(geom_data)
-    sf::st_as_sfc(wkb_obj, crs = crs)
-  }, error = function(e) {
-    # Fallback to slow path
-    sf::st_as_sfc(structure(geom_data, class = "WKB"), crs = crs)
-  })
+  converted <- if (inherits(geom_data, "sfc")) {
+    geom_data
+  } else {
+    tryCatch({
+      attributes(geom_data) <- NULL
+      sf::st_as_sfc(wk::new_wk_wkb(geom_data))
+    }, error = function(e) {
+      sf::st_as_sfc(structure(geom_data, class = "WKB"))
+    })
+  }
+
+  # st_as_sfc() from WKB does not necessarily apply a passed CRS; assign it
+  # explicitly after converting each secondary geometry.
+  if (!is.null(crs)) sf::st_crs(converted) <- sf::st_crs(crs)
+  converted
 }
 
 #' @rdname duckspatial_df_sf

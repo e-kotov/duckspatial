@@ -184,35 +184,39 @@ ddbs_write_table <- function(
         # }
 
         # 4. Prepare data for writing - import as data frame with geom as binary
-        ## Get geometry column name
-        geom_name <- setdiff(names(data), names(sf::st_drop_geometry(data)))
-        ## Extract geometry as binary and append to data frame
-        data_df <- as.data.frame(data)
-        data_df[[geom_name]] <- ddbs_sfc_to_wkb(data_df[[geom_name]])
+        geom_cols <- ddbs_sf_geometry_columns(data)
+        data_df <- ddbs_sf_wkb_data(data)
+        col_order <- ddbs_sf_column_order(data)
 
-        ## Get the CRS, and define the geometry type for duckdb
-        geom_field <- get_geometry_type_duckdb(data, conn)
-
-        ## Warn if no CRS was found in the input data
-        if (geom_field == "GEOMETRY") {
-            cli::cli_alert_warning("No CRS found in the input data. The table will be created without CRS information.")
-        }
-
-        ## Register the data frame and create the spatial table in a single pass
+        # Register once and construct each typed geometry from its own CRS.
         reg_name <- ddbs_temp_view_name()
         duckdb::duckdb_register(conn, reg_name, data_df)
         on.exit(try(duckdb::duckdb_unregister(conn, reg_name), silent = TRUE), add = TRUE)
-        q_geom <- DBI::dbQuoteIdentifier(conn, geom_name)
+
+        expressions <- vapply(col_order, function(col) {
+            q_col <- as.character(DBI::dbQuoteIdentifier(conn, col))
+            if (!col %in% geom_cols) return(q_col)
+            geom_type <- get_geometry_type_duckdb(sf::st_crs(data[[col]]), conn)
+            if (identical(geom_type, "GEOMETRY")) {
+                cli::cli_alert_warning(
+                    "No CRS found for geometry {.val {col}}; storing generic GEOMETRY."
+                )
+            }
+            paste0("ST_GeomFromWKB(", q_col, ")::", geom_type,
+                   " AS ", q_col)
+        }, character(1))
+
         DBI::dbExecute(conn, glue::glue(
-            "CREATE TABLE {name_list$sql_name} AS ",
-            "SELECT * REPLACE (ST_GeomFromWKB({sql_ident(q_geom)})::{geom_field} AS {sql_ident(q_geom)}) FROM {reg_name}"
+            "CREATE TABLE {name_list$sql_name} AS SELECT ",
+            "{paste(expressions, collapse = ', ')} FROM {sql_ident(reg_name)}"
         ))
-        ddbs_write_legacy_crs_comment_if_needed(
-            conn,
-            name_list$query_name,
-            geom_col = geom_name,
-            crs = input_crs
-        )
+
+        for (col in geom_cols) {
+            ddbs_write_legacy_crs_comment_if_needed(
+                conn, name_list$query_name, geom_col = col,
+                crs = sf::st_crs(data[[col]])
+            )
+        }
         
 
     } else if (!is.character(data) || length(data) != 1) {

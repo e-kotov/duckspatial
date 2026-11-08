@@ -101,6 +101,41 @@ ddbs_read_table <- function(
         }
     }
 
+    # Use the same WKB conversion helpers when more than one geometry exists.
+    # This function is eager already; retrieve all columns in a single query.
+    geometry_columns <- get_geom_name(conn, name_list$query_name)
+    if (length(geometry_columns) > 1L) {
+        fields <- DBI::dbListFields(conn, name_list$query_name)
+        selections <- vapply(fields, function(col) {
+            quoted <- as.character(DBI::dbQuoteIdentifier(conn, col))
+            if (col %in% geometry_columns) {
+                return(paste0("ST_AsWKB(", quoted, ") AS ", quoted))
+            }
+            quoted
+        }, character(1))
+        sql <- paste0(
+            "SELECT ", paste(selections, collapse = ", "), " FROM ",
+            name_list$sql_name,
+            if (is.null(clauses)) "" else paste0(" ", clauses)
+        )
+        data <- DBI::dbGetQuery(conn, sql)
+        active <- geometry_columns[[1]]
+        for (col in setdiff(geometry_columns, active)) {
+            data[[col]] <- convert_wkb_to_sfc(
+                data[[col]], read_native_crs(conn, name_list$query_name, col)
+            )
+        }
+        result <- convert_to_sf_wkb(
+            data, crs = read_native_crs(conn, name_list$query_name, active),
+            x_geom = active
+        )
+        if (isFALSE(quiet)) {
+            cli::cli_alert_success("{object_type} {name} successfully imported.")
+        }
+        return(result)
+    }
+
+
     ## get column names and prepare SQL
     if (object_type == "Arrow view") {
         # For Arrow views, PRAGMA table_info doesn't work, so we need to get columns differently

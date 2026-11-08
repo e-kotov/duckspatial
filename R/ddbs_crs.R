@@ -67,7 +67,7 @@ ddbs_crs.tbl_duckdb_connection <- function(x, ...) {
 
   if (!is.null(remote_table)) {
     crs_data <- tryCatch({
-      geom_name <- get_geom_name(conn, remote_table)
+      geom_name <- get_geom_name(conn, remote_table)[1]
       resolve_crs(
         conn,
         remote_table,
@@ -185,7 +185,7 @@ ddbs_crs.character <- function(x, conn, ...) {
     
     ## Get CRS from the table
     crs_data <- tryCatch({
-      geom_name <- get_geom_name(conn, x_list$query_name)
+      geom_name <- get_geom_name(conn, x_list$query_name)[1]
       resolve_crs(
         conn,
         x_list$query_name,
