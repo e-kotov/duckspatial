@@ -4,7 +4,6 @@ testthat::skip_if_not_installed("sf")
 
 test_that("typed native CRS survives empty and NULL-only columns", {
   conn <- ddbs_temp_conn()
-  on.exit(try(ddbs_stop_conn(conn), silent = TRUE), add = TRUE)
 
   DBI::dbExecute(conn, "CREATE TABLE empty_crs (g GEOMETRY('EPSG:3857'))")
   DBI::dbExecute(conn, "CREATE TABLE null_crs (g GEOMETRY('EPSG:4326'))")
@@ -20,7 +19,6 @@ test_that("typed native CRS survives empty and NULL-only columns", {
 
 test_that("a known CRS can be recovered when the first row is NULL", {
   conn <- ddbs_temp_conn()
-  on.exit(try(ddbs_stop_conn(conn), silent = TRUE), add = TRUE)
   DBI::dbExecute(conn, "CREATE TABLE nullable (g GEOMETRY('EPSG:4326'))")
   DBI::dbExecute(conn, "INSERT INTO nullable VALUES (NULL), (ST_Point(8, 50))")
   expect_equal(ddbs_crs("nullable", conn = conn)$epsg, 4326)
@@ -28,17 +26,16 @@ test_that("a known CRS can be recovered when the first row is NULL", {
 
 test_that("GeoParquet metadata distinguishes absent CRS from explicit null", {
   conn <- ddbs_temp_conn()
-  on.exit(try(ddbs_stop_conn(conn), silent = TRUE), add = TRUE)
   # Test the parser with actual on-disk footers, not just parsed JSON.
   write_fixture <- function(primary_crs = "absent") {
-    col <- list(encoding = "WKB", geometry_types = "Point")
+    col <- list(encoding = "WKB", geometry_types = list("Point"))
     if (identical(primary_crs, "null")) col["crs"] <- list(NULL)
 
     meta <- list(
       version = "1.1.0",
       primary_column = "secondary",
       columns = list(
-        geometry = list(encoding = "WKB", geometry_types = "Point",
+        geometry = list(encoding = "WKB", geometry_types = list("Point"),
                         crs = NULL),
         secondary = col
       )
@@ -60,6 +57,8 @@ test_that("GeoParquet metadata distinguishes absent CRS from explicit null", {
   p_null <- write_fixture("null")
   on.exit(unlink(c(p_absent, p_null)), add = TRUE)
 
+  expect_false(is.null(duckspatial:::get_parquet_geometry_metadata(p_absent, conn)))
+  expect_false(is.null(duckspatial:::get_parquet_geometry_metadata(p_null, conn)))
   absent <- duckspatial:::get_parquet_crs(p_absent, conn)
   unknown <- duckspatial:::get_parquet_crs(p_null, conn)
   expect_true(duckspatial:::crs_equal(absent, sf::st_crs("OGC:CRS84")))
