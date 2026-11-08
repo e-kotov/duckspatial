@@ -242,7 +242,7 @@ as_duckspatial_df.tbl_lazy <- function(
   
   # Auto-detect geometry column
   if (is.null(geom_col)) {
-    geom_col <- get_geom_name(conn, x)
+    geom_col <- get_geom_name(conn, x)[1]
   }
   
   # Extract source table for efficient get_query_list path
@@ -284,7 +284,7 @@ as_duckspatial_df.character <- function(
   
   # Auto-detect geometry column
   if (is.null(geom_col)) {
-    geom_col <- get_geom_name(conn, x)
+    geom_col <- get_geom_name(conn, x)[1]
   }
 
   # Auto-detect CRS if not provided

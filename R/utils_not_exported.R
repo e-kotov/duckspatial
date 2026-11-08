@@ -1661,6 +1661,33 @@ check_loaded_extension <- function(conn = NULL, extension) {
 
 
 
+# Identify every sfc column, not just sf's active geometry.
+ddbs_sf_geometry_columns <- function(x) {
+  names(x)[vapply(x, inherits, logical(1), "sfc")]
+}
+
+# Convert each geometry for DuckDB, leaving its other columns unchanged.
+ddbs_sf_wkb_data <- function(x) {
+  result <- as.data.frame(x)
+  for (col in ddbs_sf_geometry_columns(x)) {
+    result[[col]] <- ddbs_sfc_to_wkb(result[[col]])
+  }
+  result
+}
+
+# Preserve the active geometry by making it the first geometry column, while
+# keeping attribute positions unchanged and secondary geometries in order.
+ddbs_sf_column_order <- function(x) {
+  cols <- names(x)
+  geometries <- ddbs_sf_geometry_columns(x)
+  if (length(geometries) < 2L) return(cols)
+  active <- attr(x, "sf_column")
+  if (!active %in% geometries) return(cols)
+  cols[match(geometries, cols)] <- c(active, setdiff(geometries, active))
+  cols
+}
+
+
 #' Convert an sfc to a plain list of WKB raw vectors
 #'
 #' Uses `wk::as_wkb()` (much faster than `sf::st_as_binary()`), falling back to

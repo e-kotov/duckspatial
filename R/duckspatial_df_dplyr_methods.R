@@ -67,164 +67,116 @@ dplyr_reconstruct.duckspatial_df <- function(data, template) {
 #' @importFrom dplyr collect
 #' @importFrom rlang :=
 collect.duckspatial_df <- function(x, ..., as = NULL) {
-  # Resolve output type: parameter > global option > default "sf"
-  # Note: if global option is "duckspatial_df" (lazy), collect defaults to "sf" (eager)
   if (is.null(as)) {
     as <- getOption("duckspatial.output_type", "sf")
     if (as == "duckspatial_df") as <- "sf"
   }
-  
   as <- match.arg(as, c("sf", "tibble", "raw", "geoarrow"))
-  geom_col <- attr(x, "sf_column") %||% "geom"
-  crs_obj <- attr(x, "crs")
-  
-  # Strip class to treat as standard lazy table for further manipulation
+
+  active <- attr(x, "sf_column") %||% "geom"
   x_lazy <- x
   class(x_lazy) <- setdiff(class(x_lazy), "duckspatial_df")
-  
-  # --- Handle tibble case: just drop geometry and collect ---
-  if (as == "tibble") {
-    # If the user requested tibble, they likely don't want the geometry column
-    # or don't care about its format. 
-    # But if we just collect, it might fail if geom is effectively 'GEOMETRY' type?
-    # DuckDB returns native blobs for GEOMETRY type. R handles them as list(raw).
-    # So strictly speaking, simple collect works.
-    
-    # We drop geometry to be safe/consistent with expectation of "non-spatial tibble"
-    if (geom_col %in% colnames(x_lazy)) {
-       x_lazy <- dplyr::select(x_lazy, -dplyr::all_of(geom_col))
-    }
-    return(dplyr::collect(x_lazy, ...))
-  }
-  
-  # --- For sf/raw/geoarrow: we need Valid WKB data ---
-  # Native DuckDB geometry blobs are NOT standard WKB.
-  # We MUST inject ST_AsWKB() execution into the query.
-  
-  # Check if geometry column exists in the output
-  if (geom_col %in% colnames(x_lazy)) {
-      conn <- dbplyr::remote_con(x_lazy)
-      query_sql <- dbplyr::sql_render(x_lazy)
-      
-      # Check column type in the lazy table
-      # Use cached type from attributes if available to avoid extra DESCRIBE round-trip
-      cached_type <- attr(x, "geom_type")
-      
-      # Inject ST_AsWKB() conversion
-      # We use dbplyr::sql to pass the raw SQL function
-      # We assume the column name is safe or quoted by dbplyr if we used sym?
-      # But inside sql() we must quote manually if needed. 
-      # dbplyr::ident handles quoting.
-      
-      # Safer: use dplyr::mutate with sql snippet
-      # We need to construct the SQL "ST_AsWKB("colname")" safely.
-      # rlang::sym(geom_col) allows dbplyr to quote the column name in the generated SQL.
-      # But we need to wrap it in function.
-      
-      # Method: use explicit SQL string construction
-      # x_lazy |> mutate(geom = sql("ST_AsWKB(geom)"))
-      # But quoting: ST_AsWKB("geom")
-      
-      # Let's use dbplyr's translation if available, or raw sql.
-      # ST_AsWKB is standard.
-      
-      # Check column type in the lazy table
-      # Use cached type from attributes if available to avoid extra DESCRIBE round-trip
-      # Use cached type from attributes if available to avoid extra DESCRIBE round-trip
-      cached_type <- attr(x, "geom_type")
-      
-      # Variables to hold resolved state
-      target_col_sql <- geom_col # Default to attribute name
-      should_convert <- FALSE
-      
-      if (!is.null(cached_type)) {
-          should_convert <- grepl("GEOMETRY|BLOB", cached_type, ignore.case = TRUE)
-      } else {
-          tryCatch({
-              # Check type of geom_col
-              # DESCRIBE (query) is standard DuckDB
-              desc <- DBI::dbGetQuery(conn, glue::glue("DESCRIBE {query_sql}"))
-              
-              # Match geom_col (case insensitive search)
-              # use numeric index to handle NAs safely
-              match_idx <- which(tolower(desc$column_name) == tolower(geom_col))
-              
-              if (length(match_idx) > 0) {
-                  # Found column in DB stats
-                  idx <- match_idx[1]
-                  col_info <- desc[idx, ]
-                  
-                  # resolving correct casing from DB for quoting
-                  target_col_sql <- col_info$column_name
-                  
-                  ctype <- if ("column_type" %in% names(col_info)) col_info$column_type else col_info$data_type
-                  # We only wrap ST_AsWKB if it is GEOMETRY or BLOB/WKB_BLOB
-                  should_convert <- grepl("GEOMETRY|BLOB", ctype, ignore.case = TRUE)
-              } else {
-                  # Column not found in DESCRIBE? 
-                  # It might be present but DESCRIBE logic missed it or view shenanigans.
-                  # Fallback: Assume it exists and needs conversion (Safe path)
-                  should_convert <- TRUE
-              }
-          }, error = function(e) {
-              # Fallback: safer to wrap than to get raw DuckDB internal blobs
-              should_convert <<- TRUE 
-          })
-      }
+  fields <- colnames(x_lazy)
+  if (!active %in% fields) return(dplyr::collect(x_lazy, ...))
 
-      if (should_convert) {
-           x_lazy <- dplyr::mutate(
-               x_lazy, 
-                !!rlang::sym(geom_col) := dbplyr::sql(glue::glue("ST_AsWKB({DBI::dbQuoteIdentifier(conn, target_col_sql)})"))
-           )
-      }
-
-  }
-  
-  # Collect with dbplyr
-  collected <- dplyr::collect(x_lazy, ...)
-  
-  # --- Convert based on output format ---
-  if (!geom_col %in% names(collected)) {
-    # No geometry column found (maybe user selected it out), return as tibble
-    return(tibble::as_tibble(collected))
-  }
-  
-  if (as == "raw") {
-    # Return tibble with raw WKB bytes (no conversion)
-    return(tibble::as_tibble(collected))
-  }
-  
-  if (as == "geoarrow") {
-    # Convert WKB to geoarrow_vctr
-    geom_data <- collected[[geom_col]]
-    if (!inherits(geom_data, "geoarrow_vctr")) {
-      # Strip blob attributes if present (DuckDB blobs sometimes have extra attrs)
-      attributes(geom_data) <- NULL
-      col_converted <- tryCatch({
-         geoarrow::as_geoarrow_vctr(
-            wk::new_wk_wkb(geom_data),
-            schema = geoarrow::geoarrow_wkb()
-         )
-      }, error = function(e) {
-         cli::cli_warn("Failed to convert to geoarrow: {conditionMessage(e)}")
-         geom_data
-      })
-      collected[[geom_col]] <- col_converted
-    }
-    return(tibble::as_tibble(collected))
-  }
-  
-  # as == "sf" (default)
-  convert_to_sf_wkb(
-    data = collected,
-    crs = crs_obj,
-    x_geom = geom_col
+  conn <- dbplyr::remote_con(x_lazy)
+  query <- as.character(dbplyr::sql_render(x_lazy))
+  desc <- tryCatch(
+    DBI::dbGetQuery(conn, paste0("DESCRIBE ", query)),
+    error = function(e) NULL
   )
+  if (is.null(desc)) {
+    geom_cols <- active
+    geom_types <- stats::setNames("GEOMETRY", active)
+  } else {
+    types <- stats::setNames(desc$column_type, desc$column_name)
+    geom_cols <- names(types)[grepl("^GEOMETRY(\\(|$)|WKB_BLOB",
+                                    types, ignore.case = TRUE)]
+    geom_cols <- unique(c(geom_cols, active))
+    geom_cols <- intersect(fields, geom_cols)
+    geom_types <- types[geom_cols]
+  }
+
+  if (as == "tibble") {
+    return(dplyr::collect(dplyr::select(x_lazy, -dplyr::all_of(geom_cols)), ...))
+  }
+
+  # DuckDB's internal GEOMETRY blobs are not WKB; convert each typed column.
+  typed <- geom_cols[grepl("^GEOMETRY(\\(|$)", geom_types, ignore.case = TRUE)]
+  if (length(typed)) {
+    replacements <- lapply(typed, function(col) {
+      quoted <- as.character(DBI::dbQuoteIdentifier(conn, col))
+      dbplyr::sql(paste0("ST_AsWKB(", quoted, ")"))
+    })
+    names(replacements) <- typed
+    x_lazy <- dplyr::mutate(x_lazy, !!!replacements)
+  }
+
+  collected <- dplyr::collect(x_lazy, ...)
+  if (as == "raw") return(tibble::as_tibble(collected))
+
+  # A rendered dbplyr SELECT may erase CRS parameters from its DESCRIBE
+  # type, even when the unmodified source table declares GEOMETRY('<CRS>').
+  # Consult the source schema only if it still matches the lazy query.
+  source_types <- NULL
+  source_table <- attr(x, "source_table")
+  if (!is.null(source_table) && is.character(source_table) &&
+      length(source_table) == 1L) {
+    source_desc <- tryCatch(
+      DBI::dbGetQuery(conn, paste0("DESCRIBE ", sql_table(source_table))),
+      error = function(e) NULL
+    )
+    if (!is.null(source_desc)) {
+      source_types <- stats::setNames(
+        source_desc$column_type, source_desc$column_name
+      )
+    }
+  }
+
+  crs_map <- lapply(geom_cols, function(col) {
+    # An explicitly supplied active CRS (or the original sf CRS) wins over
+    # DuckDB's normalized authority spelling. Secondary columns have no
+    # such R attribute, so recover their own CRS from the schema.
+    if (identical(col, active) && !is.null(attr(x, "crs"))) {
+      return(sf::st_crs(attr(x, "crs")))
+    }
+    declared <- ddbs_crs_from_geometry_type(geom_types[[col]])
+    if (is.na(declared) && !is.null(source_types) &&
+        col %in% names(source_types)) {
+      declared <- ddbs_crs_from_geometry_type(source_types[[col]])
+    }
+    if (!is.na(declared)) return(declared)
+    sf::st_crs(NA)
+  })
+  names(crs_map) <- geom_cols
+
+  if (as == "geoarrow") {
+    for (col in geom_cols) {
+      geom_data <- collected[[col]]
+      if (!inherits(geom_data, "geoarrow_vctr")) {
+        attributes(geom_data) <- NULL
+        crs <- crs_map[[col]]
+        geo_crs <- if (!is.na(crs)) {
+          if (!is.na(crs$epsg)) paste0("EPSG:", crs$epsg) else crs$proj4string
+        } else NULL
+        if (!is.null(geo_crs) && (length(geo_crs) == 0 || is.na(geo_crs) ||
+                                  !nzchar(geo_crs))) geo_crs <- NULL
+        collected[[col]] <- geoarrow::as_geoarrow_vctr(
+          wk::new_wk_wkb(geom_data),
+          schema = geoarrow::geoarrow_wkb(crs = geo_crs)
+        )
+      }
+    }
+    return(tibble::as_tibble(collected))
+  }
+
+  # Convert secondary geometries first; convert_to_sf_wkb constructs the sf
+  # object with the active column without discarding any other sfc columns.
+  for (col in setdiff(geom_cols, active)) {
+    collected[[col]] <- convert_wkb_to_sfc(collected[[col]], crs_map[[col]])
+  }
+  convert_to_sf_wkb(collected, crs = crs_map[[active]], x_geom = active)
 }
-
-
-
 
 # =============================================================================
 # compute - Force execution while staying lazy
