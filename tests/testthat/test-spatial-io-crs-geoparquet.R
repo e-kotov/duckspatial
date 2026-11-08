@@ -33,11 +33,7 @@ test_that("GeoParquet metadata distinguishes absent CRS from explicit null", {
   write_fixture <- function(primary_crs = "absent") {
     col <- list(encoding = "WKB", geometry_types = "Point")
     if (identical(primary_crs, "null")) col["crs"] <- list(NULL)
-    if (identical(primary_crs, "known")) {
-      col$crs <- jsonlite::fromJSON(
-        sf::st_crs(3857)$wkt, simplifyVector = FALSE
-      )
-    }
+
     meta <- list(
       version = "1.1.0",
       primary_column = "secondary",
@@ -50,8 +46,8 @@ test_that("GeoParquet metadata distinguishes absent CRS from explicit null", {
     binary <- sf::st_as_binary(sf::st_sfc(sf::st_point(c(7, 51))))
     tab <- arrow::Table$create(
       id = 1L,
-      geometry = arrow::Array$create(binary, type = arrow::binary()),
-      secondary = arrow::Array$create(binary, type = arrow::binary())
+      geometry = arrow::Array$create(unclass(binary), type = arrow::binary()),
+      secondary = arrow::Array$create(unclass(binary), type = arrow::binary())
     )
     tab <- tab$ReplaceSchemaMetadata(list(
       geo = jsonlite::toJSON(meta, auto_unbox = TRUE, null = "null", digits = NA)
