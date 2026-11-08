@@ -118,8 +118,12 @@ test_that("mixed dimensions and empty geometries survive both ingestion paths", 
     result <- dplyr::collect(lazy, as = "sf")
 
     expect_equal(attr(result, "sf_column"), "measured")
-    expect_equal(sf::st_as_binary(result$height), sf::st_as_binary(input$height))
-    expect_equal(sf::st_as_binary(result$measured), sf::st_as_binary(input$measured))
+    # Compare actual coordinate WKB. EMPTY uses NaN values whose payload bits
+    # may be canonicalized by DuckDB, even though the geometry is unchanged.
+    expect_equal(sf::st_as_binary(result$height)[1], sf::st_as_binary(input$height)[1])
+    expect_equal(sf::st_as_binary(result$measured)[1], sf::st_as_binary(input$measured)[1])
+    expect_equal(sf::st_zm(result$height, drop = FALSE, what = "Z") |> sf::st_geometry_type(),
+                 sf::st_zm(input$height, drop = FALSE, what = "Z") |> sf::st_geometry_type())
     expect_equal(sf::st_crs(result$height)$epsg, 4326)
     expect_equal(sf::st_crs(result$measured)$epsg, 3857)
     expect_true(sf::st_is_empty(result$height)[2])
