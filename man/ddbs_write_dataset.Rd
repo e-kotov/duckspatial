@@ -19,7 +19,10 @@ ddbs_write_dataset(
   parquet_row_group_size = NULL,
   layer_creation_options = NULL,
   quiet = FALSE,
-  duckdb_storage_version = duckspatial_storage_default()
+  duckdb_storage_version = duckspatial_storage_default(),
+  geoparquet_version = "V1",
+  parquet_spatial_order = FALSE,
+  parquet_compression_level = NULL
 )
 }
 \arguments{
@@ -57,11 +60,19 @@ runs on a temporary DuckDB database.}
 
 \item{overwrite}{Logical. If \code{TRUE}, overwrites existing file.}
 
-\item{crs}{Output CRS (e.g., "EPSG:4326"). Passed to GDAL as \code{SRS} option. Ignored for Parquet.}
+\item{crs}{Output CRS assignment (e.g., \code{"EPSG:4326"}), or \code{NULL} to keep the
+input CRS. Passed to GDAL as \code{SRS}; for Parquet, affects only the active
+geometry. \code{NA} means unknown in V1; V2 requires a known CRS. Coordinates
+are unchanged; use \code{\link[=ddbs_transform]{ddbs_transform()}} or \code{\link[sf:st_transform]{sf::st_transform()}} to reproject.}
 
 \item{layer}{Table name for native DuckDB database output.}
 
-\item{options}{Named list of additional options passed to \code{COPY}.}
+\item{options}{Named list of additional \code{COPY} options. For Parquet, names
+are case-insensitive and options override the convenience arguments.
+\code{GEOPARQUET_VERSION} may select the version, but must agree with an explicit
+\code{geoparquet_version}. For V1/V2, \code{KV_METADATA} is a named list of strings
+with \code{geo} reserved. \code{PARTITION_BY} accepts column names or a parenthesized
+SQL identifier list. Spatial ordering requires \code{PRESERVE_ORDER = TRUE}.}
 
 \item{partitioning}{Character vector of columns to partition by (Parquet/CSV only).}
 
@@ -90,6 +101,18 @@ recognized by other spatial software).
 installed DuckDB engine.
 }
 Other major version strings like \code{"v1.4.0"}, \code{"v1.3.0"}, etc., are also supported.}
+
+\item{geoparquet_version}{Parquet output version: \code{"V1"} (default, GeoParquet
+1.0.0) or \code{"V2"} (2.0.0, native geometry types and row-group statistics).
+Independent of \code{PARQUET_VERSION} and \code{duckdb_storage_version}.}
+
+\item{parquet_spatial_order}{Logical, default \code{FALSE}. If \code{TRUE}, order
+Parquet rows by the active geometry's Hilbert index, with null and empty
+geometries last. Requires a single output file (no partitioning) and adds
+a dataset extent scan and sort in DuckDB.}
+
+\item{parquet_compression_level}{Optional integer ZSTD compression level.
+Requires \code{parquet_compression = "zstd"} (or the equivalent COPY option).}
 }
 \value{
 The \code{path} invisibly.
@@ -106,6 +129,13 @@ Spatial Storage} (\code{storage_version = "v1.5.0"}) by default so CRS metadata 
 retained in native \code{GEOMETRY} columns. These files require DuckDB >= 1.5.0
 to open; use \strong{Legacy Compatibility} (\code{storage_version = "v1.0.0"})
 when the output must be readable by older DuckDB versions.
+
+Parquet exports preserve the active and secondary geometry columns and their
+CRS. Lazy exports use the current query's native CRS, with the stored CRS
+attribute as a fallback for legacy DuckDB storage.
+V1 supports XY/XYZ; measured XYM/XYZM geometries require V2.
+Geometry columns must be top-level, and column names must be unique ignoring
+ASCII case.
 }
 \examples{
 \dontrun{
@@ -119,6 +149,9 @@ ds <- ddbs_open_dataset(path)
 ddbs_write_dataset(ds, "output.geojson")
 ddbs_write_dataset(ds, "output.gpkg")
 ddbs_write_dataset(ds, "output.parquet")
+
+# Opt in to GeoParquet 2.0
+ddbs_write_dataset(ds, "output_v2.parquet", geoparquet_version = "V2")
 
 # Explicit GDAL driver for non-standard extension
 ddbs_write_dataset(ds, "mydata.dat", gdal_driver = "GeoJSON")
@@ -141,6 +174,7 @@ This function is inspired by and builds upon the logic found in the
 particularly its \code{write_dataset} and \code{write_geo} functions.
 For advanced features like cloud storage (S3) support, the
 \code{duckdbfs} package is highly recommended.
+\url{https://geoparquet.org/releases/v2.0.0/}
 }
 \seealso{
 \code{\link[=ddbs_drivers]{ddbs_drivers()}} to list all available GDAL drivers and formats.
