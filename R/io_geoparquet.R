@@ -53,16 +53,7 @@ ddbs_geoparquet_crs <- function(crs) {
 
 #' @noRd
 ddbs_geoparquet_native_crs <- function(conn, type) {
-  if (identical(toupper(type), "GEOMETRY")) return(sf::st_crs(NA))
-  # Query the type, not the first feature: empty tables and NULL first rows must
-  # retain their CRS too. The type string comes from DuckDB DESCRIBE, not input.
-  value <- DBI::dbGetQuery(conn, paste0(
-    "SELECT ST_CRS(CAST('POINT(0 0)' AS ", type, ")) AS crs"
-  ))$crs[[1L]]
-  if (is.na(value) || !nzchar(value) || tolower(value) == "srid:0") {
-    return(sf::st_crs(NA))
-  }
-  ddbs_geoparquet_crs(value)
+  ddbs_crs_from_geometry_type(type)
 }
 
 #' @noRd
@@ -239,11 +230,10 @@ ddbs_write_geoparquet <- function(data, path, conn, overwrite, crs, options,
       cli::cli_abort("Column names must be non-missing and unique ignoring ASCII case for DuckDB GeoParquet export.")
     }
     primary <- attr(data, "sf_column", exact = TRUE)
-    geometry <- names(data)[vapply(data, inherits, logical(1), what = "sfc")]
+    geometry <- ddbs_sf_geometry_columns(data)
     crses <- stats::setNames(lapply(geometry, function(name) sf::st_crs(data[[name]])), geometry)
     if (!is.null(override)) crses[[primary]] <- override
-    registered <- as.data.frame(data)
-    for (name in geometry) registered[[name]] <- ddbs_sfc_to_wkb(data[[name]])
+    registered <- ddbs_sf_wkb_data(data)
     view <- ddbs_temp_view_name()
     duckdb::duckdb_register(conn, view, registered)
     on.exit(duckdb::duckdb_unregister(conn, view), add = TRUE)
