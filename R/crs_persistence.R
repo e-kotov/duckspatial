@@ -196,7 +196,7 @@ read_native_crs <- function(conn, table, geom_col) {
   )
   if (!is.null(desc) && nrow(desc) == 1L) {
     type <- desc$column_type[[1]]
-    match <- regmatches(type, regexec("^GEOMETRY\\('((?:''|[^'])*)'\\)$", type))[[1]]
+    match <- regmatches(type, regexec("^GEOMETRY\\('((?:''|[^'])*)'\\)$", type, perl = TRUE))[[1]]
     if (length(match) == 2L) {
       literal <- gsub("''", "'", match[[2]], fixed = TRUE)
       parsed <- tryCatch(sf::st_crs(literal), error = function(e) sf::st_crs(NA))
