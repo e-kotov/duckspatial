@@ -134,15 +134,18 @@ collect.duckspatial_df <- function(x, ..., as = NULL) {
   }
 
   crs_map <- lapply(geom_cols, function(col) {
+    # An explicitly supplied active CRS (or the original sf CRS) wins over
+    # DuckDB's normalized authority spelling. Secondary columns have no
+    # such R attribute, so recover their own CRS from the schema.
+    if (identical(col, active) && !is.null(attr(x, "crs"))) {
+      return(sf::st_crs(attr(x, "crs")))
+    }
     declared <- ddbs_crs_from_geometry_type(geom_types[[col]])
     if (is.na(declared) && !is.null(source_types) &&
         col %in% names(source_types)) {
       declared <- ddbs_crs_from_geometry_type(source_types[[col]])
     }
     if (!is.na(declared)) return(declared)
-    if (identical(col, active) && !is.null(attr(x, "crs"))) {
-      return(sf::st_crs(attr(x, "crs")))
-    }
     sf::st_crs(NA)
   })
   names(crs_map) <- geom_cols
