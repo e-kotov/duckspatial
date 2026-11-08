@@ -74,7 +74,7 @@ check("F4 tibble drops both geometry columns", {
   stopifnot(identical(names(out), "id"))
 })
 check("F3 GeoParquet primary column and absent CRS default", {
-  wkb <- sf::st_as_binary(p1)
+  wkb <- unclass(sf::st_as_binary(p1))
   tab <- arrow::Table$create(
     id = 1:2,
     geometry = arrow::Array$create(wkb, type = arrow::binary()),
