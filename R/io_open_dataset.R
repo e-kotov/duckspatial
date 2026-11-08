@@ -515,10 +515,18 @@ ddbs_open_dataset_crs <- function(crs, conn, view_name, geom_col, path, fmt) {
     return(if (inherits(crs, "crs")) crs else sf::st_crs(crs))
   }
 
-  # GeoParquet's footer is authoritative, including explicitly unknown CRS.
+  # The footer is authoritative, especially explicit crs: null. If a
+  # declared non-null custom PROJJSON cannot be parsed by sf, the native
+  # typed DuckDB geometry still provides an equivalent CRS fallback.
   if (identical(fmt, "parquet")) {
     from_footer <- get_parquet_crs(path, conn, geom_col)
-    if (!is.null(from_footer)) return(from_footer)
+    if (!is.null(from_footer)) {
+      if (!is.na(from_footer)) return(from_footer)
+      meta <- get_parquet_geometry_metadata(path, conn)
+      column <- meta$columns[[geom_col]]
+      if (!is.null(column) && "crs" %in% names(column) &&
+          is.null(column$crs)) return(from_footer)
+    }
   }
 
   from_duckdb <- read_native_crs(conn, view_name, geom_col)
