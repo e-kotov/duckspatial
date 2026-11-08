@@ -128,3 +128,16 @@ test_that("mixed dimensions and empty geometries survive both ingestion paths", 
     expect_true(sf::st_is_empty(result$measured)[2])
   }
 })
+
+test_that("active geometry retains explicitly supplied CRS representation", {
+  conn <- ddbs_temp_conn()
+  nc <- sf::st_read(system.file("shape/nc.shp", package = "sf"), quiet = TRUE)[1:3, ]
+  ddbs_write_table(conn, nc, "nc_explicit", quiet = TRUE)
+  lazy <- as_duckspatial_df("nc_explicit", conn = conn, crs = sf::st_crs(nc))
+  result <- dplyr::collect(lazy, as = "sf")
+  expect_equal(sf::st_crs(result), sf::st_crs(nc))
+
+  lazy_sf <- as_duckspatial_df(nc[0, ], conn = conn)
+  result_zero <- dplyr::collect(lazy_sf, as = "sf")
+  expect_equal(sf::st_crs(result_zero), sf::st_crs(nc))
+});
