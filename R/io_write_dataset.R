@@ -425,7 +425,7 @@ ddbs_write_dataset <- function(
   
   # Options: Partitioning (Native only)
   if (!is.null(partitioning) && length(partitioning) > 0) {
-     p_cols <- paste(partitioning, collapse = ", ")
+     p_cols <- paste(sql_ident(partitioning), collapse = ", ")
      copy_ops$PARTITION_BY <- paste0("(", p_cols, ")")
   }
   
@@ -455,7 +455,7 @@ ddbs_write_dataset <- function(
               if (grepl("^\\(", val)) {
                   val_str <- val 
               } else {
-                  val_str <- paste0("'", val, "'")
+                  val_str <- as.character(DBI::dbQuoteString(conn, val))
               }
           }
           paste0(n, " ", val_str)
@@ -464,7 +464,7 @@ ddbs_write_dataset <- function(
   }
   
   opt_str <- fmt_opts(copy_ops)
-  query <- glue::glue("COPY {sql_source} TO '{path}' ({opt_str})")
+  query <- glue::glue("COPY {sql_source} TO {DBI::dbQuoteString(conn, path)} ({opt_str})")
   
   tryCatch({
       DBI::dbExecute(conn, query)
