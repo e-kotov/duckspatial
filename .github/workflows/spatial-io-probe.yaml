@@ -19,5 +19,6 @@ jobs:
         with:
           extra-packages: any::pkgload
           needs: check
+          install-quarto: false
       - name: Probe spatial I/O
         run: Rscript .github/probes/spatial-io.R
